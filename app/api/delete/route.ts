@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { UPLOAD_DIR, isSafeStoredName } from "@/lib/storage";
+import { deleteMetadata } from "@/lib/metadata";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,7 @@ export async function DELETE(req: NextRequest) {
   } catch {
     // best-effort
   }
+  await deleteMetadata(name);
 
   return NextResponse.json({ ok: true });
 }

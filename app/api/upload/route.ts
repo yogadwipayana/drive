@@ -7,6 +7,8 @@ import {
   secureImageUpload,
 } from "@/lib/image-security";
 import { UPLOAD_DIR, ensureUploadDir, shortId, safeBaseName } from "@/lib/storage";
+import { writeMetadata } from "@/lib/metadata";
+import { isSafeAlbumId, readAlbum } from "@/lib/albums";
 
 export const runtime = "nodejs";
 
@@ -23,6 +25,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
+  const albumIdRaw = form.get("albumId");
+  let albumId: string | undefined;
+  if (typeof albumIdRaw === "string" && albumIdRaw.length > 0) {
+    if (!isSafeAlbumId(albumIdRaw)) {
+      return NextResponse.json({ error: "Invalid albumId" }, { status: 400 });
+    }
+    const album = await readAlbum(albumIdRaw);
+    if (!album) {
+      return NextResponse.json({ error: "Album not found" }, { status: 404 });
+    }
+    albumId = album.id;
+  }
+
   await ensureUploadDir();
 
   const saved: { name: string; url: string; size: number; width?: number; height?: number; thumbUrl: string }[] = [];
@@ -36,6 +51,17 @@ export async function POST(req: NextRequest) {
       const dest = path.join(UPLOAD_DIR, stored);
 
       await writeFile(dest, secured.buffer, { flag: "wx" });
+
+      await writeMetadata({
+        storedName: stored,
+        originalName: file.name,
+        mime: secured.mime,
+        size: secured.buffer.length,
+        width: secured.width,
+        height: secured.height,
+        uploadedAt: Date.now(),
+        albumId,
+      });
 
       saved.push({ name: stored, url: `/i/${stored}`, size: secured.buffer.length, width: secured.width, height: secured.height, thumbUrl: `/api/thumb/${stored}` });
       auditImageSecurity({
