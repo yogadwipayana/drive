@@ -1,0 +1,352 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0f1115;
+  color: #e6e6e6;
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: #6ea8ff;
+}
+
+button {
+  font: inherit;
+}
+
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.subtitle {
+  color: #9aa0a6;
+  margin-top: 6px;
+}
+
+.dropzone {
+  border: 2px dashed #2a2f3a;
+  background: #161922;
+  border-radius: 12px;
+  padding: 36px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+  position: relative;
+}
+
+.dropzone.is-dragging {
+  border-color: #6ea8ff;
+  background: #15203a;
+}
+
+.dropzone-primary {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.dropzone-hint {
+  color: #7a808a;
+  font-size: 13px;
+}
+
+.error {
+  background: #2a1414;
+  color: #ffb4b4;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 16px;
+  white-space: pre-wrap;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.gallery {
+  margin-top: 32px;
+}
+
+.gallery-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.gallery-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.gallery-count {
+  color: #7a808a;
+}
+
+.btn {
+  background: transparent;
+  border: 1px solid #2a2f3a;
+  color: #e6e6e6;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-sm {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.empty {
+  color: #7a808a;
+  font-size: 14px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  list-style: none;
+}
+
+.card {
+  background: #161922;
+  border: 1px solid #2a2f3a;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-thumb {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
+  background: #0a0c11;
+}
+
+.card-body {
+  padding: 8px;
+  font-size: 12px;
+}
+
+.card-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  color: #7a808a;
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 20px 14px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+
+  .dropzone {
+    padding: 28px 14px;
+  }
+
+  .dropzone-primary {
+    font-size: 15px;
+  }
+
+  .gallery {
+    margin-top: 24px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+
+  .card-thumb {
+    height: 120px;
+  }
+}
+
+@media (max-width: 380px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Progress overlay */
+.progress {
+  margin-top: 12px;
+  background: #161922;
+  border: 1px solid #2a2f3a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.progress-name {
+  flex: 0 0 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #9aa0a6;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: #2a2f3a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #6ea8ff;
+  border-radius: 3px;
+  transition: width 80ms linear;
+}
+
+.progress-pct {
+  flex: 0 0 28px;
+  text-align: right;
+  color: #7a808a;
+  font-size: 11px;
+}
+
+/* Card thumb wrapper for positioning delete button */
+.card-thumb-wrap {
+  position: relative;
+  cursor: pointer;
+}
+
+/* Delete button */
+.card-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 120ms;
+  padding: 0;
+}
+
+.card:hover .card-delete,
+.card:focus-within .card-delete {
+  opacity: 1;
+}
+
+/* Lightbox */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.lightbox-img {
+  max-width: 95vw;
+  max-height: 95vh;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #2a2f3a;
+  color: #e6e6e6;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 1001;
+}
+
+.lightbox-link {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #6ea8ff;
+}
+
+@media (max-width: 600px) {
+  .progress-name {
+    flex: 0 0 100px;
+  }
+
+  .lightbox-close {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+}
