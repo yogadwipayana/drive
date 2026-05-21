@@ -747,8 +747,7 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
           selecting={selecting}
           onToggleSelecting={() => (selecting ? exitSelectMode() : setSelecting(true))}
           onOpenMobileMenu={() => setMobileOpen(true)}
-          title={sectionTitle}
-          count={total}
+          userEmail={userEmail}
         />
 
         <div className="account-strip">

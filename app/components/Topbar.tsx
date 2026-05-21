@@ -1,8 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Dropdown } from "./Dropdown";
-import { MenuIcon, SearchIcon } from "./icons";
-import { ThemeToggle } from "./ThemeToggle";
+import { MenuIcon, SearchIcon, SortIcon } from "./icons";
 
 type SortKey = "date" | "name" | "size";
 type Order = "asc" | "desc";
@@ -17,8 +17,7 @@ type TopbarProps = {
   selecting: boolean;
   onToggleSelecting: () => void;
   onOpenMobileMenu: () => void;
-  title: string;
-  count: number;
+  userEmail: string;
 };
 
 const SORT_OPTIONS = [
@@ -42,9 +41,29 @@ export function Topbar({
   selecting,
   onToggleSelecting,
   onOpenMobileMenu,
-  title,
-  count,
+  userEmail,
 }: TopbarProps) {
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortBtnRef = useRef<HTMLButtonElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close sort popover on outside click
+  useEffect(() => {
+    if (!sortOpen) return;
+    function handler(e: MouseEvent) {
+      if (
+        sortMenuRef.current &&
+        !sortMenuRef.current.contains(e.target as Node) &&
+        sortBtnRef.current &&
+        !sortBtnRef.current.contains(e.target as Node)
+      ) {
+        setSortOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [sortOpen]);
+
   return (
     <header className="topbar">
       {/* Mobile hamburger — CSS hides this on wider viewports */}
@@ -57,13 +76,7 @@ export function Topbar({
         <MenuIcon />
       </button>
 
-      {/* Section title — CSS hides this on narrow viewports */}
-      <div className="topbar-title-block">
-        <span className="topbar-title">{title}</span>
-        {count > 0 && <span className="topbar-count">{count}</span>}
-      </div>
-
-      {/* Search field */}
+      {/* Search field — centered */}
       <div className="topbar-search-wrap">
         <span className="topbar-search-icon">
           <SearchIcon />
@@ -79,21 +92,36 @@ export function Topbar({
 
       {/* Right-side actions */}
       <div className="topbar-actions">
-        <div className="topbar-sort">
-          <Dropdown
-            value={sort}
-            onChange={(v) => onSortChange(v as SortKey)}
-            options={SORT_OPTIONS}
-            ariaLabel="Sort by"
-            size="sm"
-          />
-          <Dropdown
-            value={order}
-            onChange={(v) => onOrderChange(v as Order)}
-            options={ORDER_OPTIONS}
-            ariaLabel="Order"
-            size="sm"
-          />
+        {/* Sort popover trigger */}
+        <div className="topbar-sort" style={{ position: "relative" }}>
+          <button
+            ref={sortBtnRef}
+            type="button"
+            className="topbar-icon-btn"
+            aria-label="Sort options"
+            aria-expanded={sortOpen}
+            onClick={() => setSortOpen((v) => !v)}
+          >
+            <SortIcon />
+          </button>
+          {sortOpen && (
+            <div ref={sortMenuRef} className="topbar-sort-menu">
+              <Dropdown
+                value={sort}
+                onChange={(v) => onSortChange(v as SortKey)}
+                options={SORT_OPTIONS}
+                ariaLabel="Sort by"
+                size="sm"
+              />
+              <Dropdown
+                value={order}
+                onChange={(v) => onOrderChange(v as Order)}
+                options={ORDER_OPTIONS}
+                ariaLabel="Order"
+                size="sm"
+              />
+            </div>
+          )}
         </div>
 
         <button
@@ -104,7 +132,14 @@ export function Topbar({
           {selecting ? "Done" : "Select"}
         </button>
 
-        <ThemeToggle />
+        {/* Account avatar */}
+        <div
+          className="topbar-avatar"
+          title={userEmail}
+          aria-label={`Account: ${userEmail}`}
+        >
+          {userEmail[0].toUpperCase()}
+        </div>
       </div>
     </header>
   );

@@ -129,7 +129,6 @@ export default function Sidebar({
           </svg>
           <span className="sidebar-brand-text">
             <span className="sidebar-brand-name">Vista</span>
-            <span className="sidebar-brand-sub">Image host</span>
           </span>
         </div>
 
@@ -141,7 +140,12 @@ export default function Sidebar({
           aria-label="New album"
         >
           <span className="sidebar-new-icon">
-            <PlusIcon size={20} />
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285f4" d="M11 3h2v8h-2z"/>
+              <path fill="#34a853" d="M13 11h8v2h-8z"/>
+              <path fill="#fbbc04" d="M11 13h2v8h-2z"/>
+              <path fill="#ea4335" d="M3 11h8v2H3z"/>
+            </svg>
           </span>
           New
         </button>
@@ -282,6 +286,12 @@ export default function Sidebar({
               })}
             </ul>
           )}
+        </div>
+
+        {/* Storage usage */}
+        <div className="sidebar-storage">
+          <div className="sidebar-storage-bar"><div className="sidebar-storage-fill" style={{ width: "20%" }} /></div>
+          <div className="sidebar-storage-text">3 GB of 15 GB used</div>
         </div>
       </aside>
 
