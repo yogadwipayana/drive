@@ -37,14 +37,14 @@ export default function LoginPage() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-brand">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect x="2" y="4" width="24" height="20" rx="3" stroke="#6ea8ff" strokeWidth="1.5"/>
-              <circle cx="9" cy="11" r="2.5" stroke="#6ea8ff" strokeWidth="1.5"/>
-              <path d="M2 20l6-6 4 4 4-5 8 7" stroke="#6ea8ff" strokeWidth="1.5" strokeLinejoin="round"/>
+            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="32" height="32" rx="8" fill="#6ea8ff"/>
+              <path d="M7 23l5.5-7 4 5 4-6 4.5 8H7z" stroke="#ffffff" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              <circle cx="11.5" cy="12" r="1.75" stroke="#ffffff" strokeWidth="1.75" fill="none"/>
             </svg>
           </div>
           <div>
-            <h1 className="auth-heading">Welcome back</h1>
+            <h1 className="auth-heading">Welcome back to Vista</h1>
             <p className="auth-sub">Sign in to your account</p>
           </div>
         </div>

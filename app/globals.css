@@ -977,10 +977,17 @@ button {
 }
 
 .sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 16px;
   font-weight: 700;
   padding: 4px 12px 8px;
   color: #e6e6e6;
+}
+
+.sidebar-brand-mark {
+  flex-shrink: 0;
 }
 
 .sidebar-nav {

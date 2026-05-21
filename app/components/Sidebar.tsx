@@ -84,7 +84,35 @@ export default function Sidebar({
     <>
       <div className="sidebar-backdrop" onClick={onCloseMobile} />
       <aside className={`sidebar${mobileOpen ? " is-open" : ""}`}>
-        <div className="sidebar-brand">Image Host</div>
+        <div className="sidebar-brand">
+          <svg
+            className="sidebar-brand-mark"
+            width="22"
+            height="22"
+            viewBox="0 0 32 32"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <rect width="32" height="32" rx="8" fill="#6ea8ff" />
+            <path
+              d="M7 23l5.5-7 4 5 4-6 4.5 8H7z"
+              stroke="#ffffff"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+            <circle
+              cx="11.5"
+              cy="12"
+              r="1.75"
+              stroke="#ffffff"
+              strokeWidth="1.75"
+              fill="none"
+            />
+          </svg>
+          <span>Vista</span>
+        </div>
 
         <nav aria-label="Main navigation">
           <ul className="sidebar-nav">
