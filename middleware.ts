@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { randomBytes } from "node:crypto";
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function middleware(req: NextRequest) {
-  // CSRF: Origin check on mutating methods
   if (MUTATING.has(req.method)) {
     const origin = req.headers.get("origin");
     if (origin) {
@@ -25,12 +25,31 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  const res = NextResponse.next();
+  const nonce = randomBytes(16).toString("base64");
 
-  res.headers.set(
-    "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
-  );
+  // script-src: nonce + strict-dynamic disables 'unsafe-inline' on CSP3
+  // browsers; the literal is kept only as a fallback for legacy clients.
+  // style-src keeps 'unsafe-inline' because Next.js / React 19 emit inline
+  // styles during SSR that are not nonced.
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join("; ");
+
+  const reqHeaders = new Headers(req.headers);
+  reqHeaders.set("x-nonce", nonce);
+
+  const res = NextResponse.next({ request: { headers: reqHeaders } });
+
+  res.headers.set("Content-Security-Policy", csp);
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
