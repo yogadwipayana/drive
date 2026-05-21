@@ -111,7 +111,7 @@ export default function Sidebar({
               fill="none"
             />
           </svg>
-          <span>Vista</span>
+          <span>Drive</span>
         </div>
 
         <nav aria-label="Main navigation">

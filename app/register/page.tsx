@@ -49,7 +49,7 @@ export default function RegisterPage() {
             </svg>
           </div>
           <div>
-            <h1 className="auth-heading">Create your Vista account</h1>
+            <h1 className="auth-heading">Create your Drive account</h1>
             <p className="auth-sub">Start hosting your images in seconds</p>
           </div>
         </div>

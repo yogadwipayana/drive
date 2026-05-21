@@ -44,7 +44,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <div>
-            <h1 className="auth-heading">Welcome back to Vista</h1>
+            <h1 className="auth-heading">Welcome back to Drive</h1>
             <p className="auth-sub">Sign in to your account</p>
           </div>
         </div>
