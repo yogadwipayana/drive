@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 
 type Album = { id: string; name: string; createdAt: number; count: number };
@@ -20,8 +20,18 @@ type SidebarProps = {
   onCreateAlbum: () => void;
   onRenameAlbum: (id: string, currentName: string) => void;
   onDeleteAlbum: (id: string, name: string) => void;
+  onRefresh: () => void;
   onCloseMobile: () => void;
 };
+
+type SidebarMenuKind =
+  | { kind: "home" }
+  | { kind: "trash" }
+  | { kind: "unfiled" }
+  | { kind: "albums" }
+  | { kind: "album"; album: Album };
+
+type SidebarMenu = SidebarMenuKind & { x: number; y: number };
 
 const HomeIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -49,6 +59,7 @@ export default function Sidebar({
   onCreateAlbum,
   onRenameAlbum,
   onDeleteAlbum,
+  onRefresh,
   onCloseMobile,
 }: SidebarProps) {
   const handleHome = useCallback(() => {
@@ -74,11 +85,16 @@ export default function Sidebar({
     [onSelectAlbum, mobileOpen, onCloseMobile]
   );
 
-  const [albumMenu, setAlbumMenu] = useState<
-    { x: number; y: number; album: Album } | null
-  >(null);
+  const [menu, setMenu] = useState<SidebarMenu | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
 
-  const closeAlbumMenu = useCallback(() => setAlbumMenu(null), []);
+  const openMenu = useCallback(
+    (e: ReactMouseEvent, m: SidebarMenuKind) => {
+      e.preventDefault();
+      setMenu({ ...m, x: e.clientX, y: e.clientY });
+    },
+    []
+  );
 
   return (
     <>
@@ -93,6 +109,7 @@ export default function Sidebar({
                 type="button"
                 className={`sidebar-link${view === "home" ? " is-active" : ""}`}
                 onClick={handleHome}
+                onContextMenu={(e) => openMenu(e, { kind: "home" })}
                 aria-current={view === "home" ? "page" : undefined}
               >
                 <HomeIcon />
@@ -104,6 +121,7 @@ export default function Sidebar({
                 type="button"
                 className={`sidebar-link${view === "trash" ? " is-active" : ""}`}
                 onClick={handleTrash}
+                onContextMenu={(e) => openMenu(e, { kind: "trash" })}
                 aria-current={view === "trash" ? "page" : undefined}
               >
                 <TrashIcon />
@@ -114,7 +132,14 @@ export default function Sidebar({
         </nav>
 
         <div className="sidebar-albums-section">
-          <div style={{ display: "flex", alignItems: "center" }}>
+          <div
+            style={{ display: "flex", alignItems: "center" }}
+            onContextMenu={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.closest(".sidebar-album")) return;
+              openMenu(e, { kind: "albums" });
+            }}
+          >
             <button
               type="button"
               className="sidebar-section-header"
@@ -143,6 +168,7 @@ export default function Sidebar({
                   type="button"
                   className={`sidebar-album${view === "unfiled" ? " is-active" : ""}`}
                   onClick={handleUnfiled}
+                  onContextMenu={(e) => openMenu(e, { kind: "unfiled" })}
                   aria-current={view === "unfiled" ? "page" : undefined}
                 >
                   <span className="sidebar-album-name">Unfiled</span>
@@ -158,10 +184,7 @@ export default function Sidebar({
                       className={`sidebar-album${isActive ? " is-active" : ""}`}
                       onClick={() => handleAlbum(album.id)}
                       onDoubleClick={() => onRenameAlbum(album.id, album.name)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setAlbumMenu({ x: e.clientX, y: e.clientY, album });
-                      }}
+                      onContextMenu={(e) => openMenu(e, { kind: "album", album })}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
@@ -192,36 +215,74 @@ export default function Sidebar({
           )}
         </div>
       </aside>
-      {albumMenu && (
-        <ContextMenu
-          x={albumMenu.x}
-          y={albumMenu.y}
-          items={
-            [
+      {menu &&
+        (() => {
+          let items: ContextMenuItem[] = [];
+          if (menu.kind === "home") {
+            items = [
+              { kind: "item", label: "Open", onSelect: handleHome },
+              { kind: "item", label: "Refresh", onSelect: onRefresh },
+              { kind: "separator" },
+              { kind: "item", label: "New album", onSelect: onCreateAlbum },
+            ];
+          } else if (menu.kind === "trash") {
+            items = [
+              { kind: "item", label: "Open", onSelect: handleTrash },
+              { kind: "item", label: "Refresh", onSelect: onRefresh },
+              { kind: "separator" },
               {
                 kind: "item",
-                label: "Open",
-                onSelect: () => handleAlbum(albumMenu.album.id),
+                label: "Empty trash",
+                disabled: true,
+                danger: true,
+                onSelect: () => {},
               },
+            ];
+          } else if (menu.kind === "unfiled") {
+            items = [
+              { kind: "item", label: "Open", onSelect: handleUnfiled },
+              { kind: "item", label: "Refresh", onSelect: onRefresh },
+              { kind: "separator" },
+              { kind: "item", label: "New album", onSelect: onCreateAlbum },
+            ];
+          } else if (menu.kind === "albums") {
+            items = [
+              { kind: "item", label: "New album", onSelect: onCreateAlbum },
+              {
+                kind: "item",
+                label: albumsExpanded ? "Collapse" : "Expand",
+                onSelect: onToggleAlbumsExpanded,
+              },
+              { kind: "separator" },
+              { kind: "item", label: "Refresh", onSelect: onRefresh },
+            ];
+          } else if (menu.kind === "album") {
+            const a = menu.album;
+            items = [
+              { kind: "item", label: "Open", onSelect: () => handleAlbum(a.id) },
               {
                 kind: "item",
                 label: "Rename",
-                onSelect: () =>
-                  onRenameAlbum(albumMenu.album.id, albumMenu.album.name),
+                onSelect: () => onRenameAlbum(a.id, a.name),
               },
               { kind: "separator" },
               {
                 kind: "item",
                 label: "Delete",
                 danger: true,
-                onSelect: () =>
-                  onDeleteAlbum(albumMenu.album.id, albumMenu.album.name),
+                onSelect: () => onDeleteAlbum(a.id, a.name),
               },
-            ] satisfies ContextMenuItem[]
+            ];
           }
-          onClose={closeAlbumMenu}
-        />
-      )}
+          return (
+            <ContextMenu
+              x={menu.x}
+              y={menu.y}
+              items={items}
+              onClose={closeMenu}
+            />
+          );
+        })()}
     </>
   );
 }
