@@ -16,6 +16,8 @@ const RASTER_MIME = new Set([
   "image/x-icon",
 ]);
 
+// SVG is intentionally excluded — serving SVG on the app origin enables stored XSS.
+
 export type SecurityAuditEvent = {
   action: "accepted" | "rejected";
   fileName: string;
@@ -70,28 +72,15 @@ function detectMime(buffer: Buffer): { mime: string; ext: string } | null {
     return { mime: "image/x-icon", ext: ".ico" };
   }
 
-  const prefix = buffer.subarray(0, Math.min(buffer.length, 512)).toString("utf8").trimStart().toLowerCase();
-  if (prefix.startsWith("<svg") || prefix.startsWith("<?xml")) {
-    return { mime: "image/svg+xml", ext: ".svg" };
-  }
-
   return null;
 }
 
 function assertNoEmbeddedPayload(buffer: Buffer): void {
-  const text = buffer.subarray(0, Math.min(buffer.length, 4096)).toString("latin1").toLowerCase();
+  // Scan the full buffer — truncating to 4096 bytes misses payloads appended after the image header.
+  const text = buffer.toString("latin1").toLowerCase();
   if (text.includes("<script") || text.includes("<?php") || text.includes("#!/") || text.includes("<html")) {
     throw new ImageSecurityError("File contains suspicious embedded content");
   }
-}
-
-function sanitizeSvg(buffer: Buffer): Buffer {
-  const svg = buffer.toString("utf8");
-  const lowered = svg.toLowerCase();
-  if (!lowered.includes("<svg") || lowered.includes("<script") || lowered.includes("onload=") || lowered.includes("onerror=") || lowered.includes("javascript:") || lowered.includes("data:text/html") || lowered.includes("<foreignobject")) {
-    throw new ImageSecurityError("SVG contains unsafe content");
-  }
-  return Buffer.from(svg.replace(/<\?xml[^>]*>/i, "").replace(/<!doctype[^>]*>/i, ""), "utf8");
 }
 
 async function withTimeout<T>(promise: Promise<T>): Promise<T> {
@@ -161,8 +150,7 @@ export async function secureImageUpload(file: File): Promise<SecuredImage> {
   }
 
   if (detected.mime === "image/svg+xml") {
-    const buffer = sanitizeSvg(input);
-    return { buffer, mime: detected.mime, ext: detected.ext };
+    throw new ImageSecurityError("SVG uploads are not supported");
   }
 
   if (!RASTER_MIME.has(detected.mime)) {

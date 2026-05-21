@@ -1,5 +1,7 @@
-import { NextRequest } from "next/server";
-import { stat, readFile } from "node:fs/promises";
+import { NextRequest, NextResponse } from "next/server";
+import { stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import path from "node:path";
 import {
   UPLOAD_DIR,
@@ -49,14 +51,32 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const data = await readFile(resolved);
-  const ext = path.extname(resolved);
-  return new Response(data, {
+  const ext = path.extname(resolved).toLowerCase();
+
+  // Legacy SVG files must never be served as image/svg+xml (stored XSS risk).
+  // Serve as a forced download with a neutral content type instead.
+  if (ext === ".svg") {
+    const stream = Readable.toWeb(createReadStream(resolved)) as ReadableStream;
+    return new NextResponse(stream, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${path.basename(resolved)}"`,
+        "Content-Length": String(info.size),
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": isPublic ? "public, max-age=3600" : "private, max-age=3600",
+      },
+    });
+  }
+
+  const stream = Readable.toWeb(createReadStream(resolved)) as ReadableStream;
+  return new NextResponse(stream, {
     status: 200,
     headers: {
       "Content-Type": contentTypeForExt(ext),
       "Content-Length": String(info.size),
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": isPublic ? "public, max-age=3600" : "private, max-age=3600",
     },
   });
 }

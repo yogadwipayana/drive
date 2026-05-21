@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     }
     restoreImage(name);
     restored.push(name);
+    console.info(JSON.stringify({ event: "trash_restore", userId: user.id, storedName: name, ts: new Date().toISOString() }));
   }
 
   return NextResponse.json({ restored, missing });

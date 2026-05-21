@@ -17,17 +17,13 @@ type AlbumRow = {
   createdAt: number;
 };
 
-const BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-export function newAlbumId(len = 10): string {
-  const bytes = randomBytes(len);
-  let result = "";
-  for (let i = 0; i < len; i++) result += BASE62[bytes[i] % 62];
-  return result;
+export function newAlbumId(_len?: number): string {
+  return randomBytes(16).toString("base64url"); // ~22 chars, 128 bits, no modulo bias
 }
 
 export function isSafeAlbumId(id: string): boolean {
-  return /^[A-Za-z0-9]{4,32}$/.test(id);
+  // Accept alphanumeric plus base64url chars (-_); length 4–32
+  return /^[A-Za-z0-9_-]{4,32}$/.test(id);
 }
 
 export function sanitizeAlbumName(input: string): string {

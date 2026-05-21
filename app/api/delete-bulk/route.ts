@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
   for (const name of names as string[]) {
     const image = getImage(name);
     if (!image || image.userId !== user.id) {
+      console.warn(JSON.stringify({ event: "authz_denied", route: "delete-bulk", userId: user.id, storedName: name, ip: req.headers.get("x-forwarded-for") ?? "unknown", ts: new Date().toISOString() }));
       missing.push(name);
       continue;
     }

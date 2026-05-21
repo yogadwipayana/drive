@@ -9,6 +9,16 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+const THUMB_TIMEOUT_MS = 10_000;
+
+function withThumbTimeout<T>(promise: Promise<T>): Promise<T> {
+  let timeout: NodeJS.Timeout;
+  const timer = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error("Thumbnail generation timed out")), THUMB_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timer]).finally(() => clearTimeout(timeout));
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ name: string }> },
@@ -45,9 +55,9 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  // SVG: redirect instead of resizing
+  // SVG is no longer a valid stored type — return 404 rather than redirecting.
   if (name.toLowerCase().endsWith(".svg")) {
-    return NextResponse.redirect(new URL(`/i/${name}`, _req.url), 308);
+    return new Response("Not found", { status: 404 });
   }
 
   const thumbsDir = path.join(UPLOAD_DIR, ".thumbs");
@@ -56,6 +66,7 @@ export async function GET(
   const headers = {
     "Content-Type": "image/webp",
     "Cache-Control": "public, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
   };
 
   try {
@@ -68,15 +79,22 @@ export async function GET(
     // cache miss — generate below
   }
 
-  const src = await readFile(resolved);
-  const thumb = await sharp(src)
-    .rotate()
-    .resize(480, 480, { fit: "cover" })
-    .webp({ quality: 80 })
-    .toBuffer();
+  try {
+    const src = await readFile(resolved);
+    const thumb = await withThumbTimeout(
+      sharp(src)
+        .rotate()
+        .resize(480, 480, { fit: "cover" })
+        .webp({ quality: 80 })
+        .toBuffer(),
+    );
 
-  await mkdir(thumbsDir, { recursive: true });
-  await writeFile(thumbPath, thumb);
+    await mkdir(thumbsDir, { recursive: true });
+    await writeFile(thumbPath, thumb);
 
-  return new Response(thumb, { status: 200, headers });
+    return new Response(thumb, { status: 200, headers });
+  } catch (err) {
+    console.error("Thumbnail generation failed for", name, err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Thumbnail generation failed" }, { status: 500 });
+  }
 }

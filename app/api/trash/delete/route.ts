@@ -55,15 +55,19 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    // Audit log before permanent delete
+    console.warn(JSON.stringify({ event: "permanent_delete", userId: user.id, storedName: name, ts: new Date().toISOString() }));
+
+    // DB delete first; then best-effort unlink (orphan file < orphan row)
+    deleteImage(name);
+
     try {
       await unlink(resolved);
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       if (code !== "ENOENT") {
-        failed.push({
-          name,
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
+        console.error(JSON.stringify({ event: "unlink_failed", userId: user.id, storedName: name, ts: new Date().toISOString() }));
+        failed.push({ name, error: "Failed to delete file" });
         continue;
       }
     }
@@ -72,7 +76,6 @@ export async function POST(req: NextRequest) {
     } catch {
       // best-effort
     }
-    deleteImage(name);
     deleted.push(name);
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
+import { writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import {
   ImageSecurityError,
@@ -7,11 +7,15 @@ import {
   secureImageUpload,
 } from "@/lib/image-security";
 import { UPLOAD_DIR, ensureUploadDir, shortId, safeBaseName } from "@/lib/storage";
-import { createImage } from "@/lib/metadata";
+import { createImage, getUserStorageBytes } from "@/lib/metadata";
 import { isSafeAlbumId, getAlbumById } from "@/lib/albums";
 import { authErrorResponse, requireUser } from "@/lib/auth";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+
+const QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
+const MAX_FILES_PER_REQUEST = 20;
 
 export async function POST(req: NextRequest) {
   let user;
@@ -21,6 +25,18 @@ export async function POST(req: NextRequest) {
     const r = authErrorResponse(e);
     if (r) return r;
     throw e;
+  }
+
+  // Rate limit: 60 uploads per user per minute
+  const rl = checkRateLimit("upload:" + user.id, { max: 60, windowMs: 60_000 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many uploads, please slow down" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rl.retryAfterSec) },
+      },
+    );
   }
 
   let form: FormData;
@@ -33,6 +49,12 @@ export async function POST(req: NextRequest) {
   const files = form.getAll("file").filter((v): v is File => v instanceof File);
   if (files.length === 0) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+  if (files.length > MAX_FILES_PER_REQUEST) {
+    return NextResponse.json(
+      { error: "Too many files in one request (max 20)" },
+      { status: 400 },
+    );
   }
 
   const albumIdRaw = form.get("albumId");
@@ -48,8 +70,16 @@ export async function POST(req: NextRequest) {
     albumId = album.id;
   }
 
+  // Per-user quota check: 10 GiB
+  const usedBytes = getUserStorageBytes(user.id);
+  const incomingBytes = files.reduce((sum, f) => sum + f.size, 0);
+  if (usedBytes + incomingBytes > QUOTA_BYTES) {
+    return NextResponse.json({ error: "Storage quota exceeded" }, { status: 413 });
+  }
+
   await ensureUploadDir();
 
+  const ip = clientIp(req);
   const saved: { name: string; url: string; size: number; width?: number; height?: number; thumbUrl: string }[] = [];
   const errors: { name: string; error: string }[] = [];
 
@@ -60,19 +90,24 @@ export async function POST(req: NextRequest) {
       const stored = `${base}-${shortId(8)}${secured.ext}`;
       const dest = path.join(UPLOAD_DIR, stored);
 
+      // Atomicity: write file first, then DB insert; unlink on DB failure
       await writeFile(dest, secured.buffer, { flag: "wx" });
-
-      createImage({
-        storedName: stored,
-        userId: user.id,
-        originalName: file.name,
-        mime: secured.mime,
-        size: secured.buffer.length,
-        width: secured.width,
-        height: secured.height,
-        uploadedAt: Date.now(),
-        albumId,
-      });
+      try {
+        createImage({
+          storedName: stored,
+          userId: user.id,
+          originalName: file.name,
+          mime: secured.mime,
+          size: secured.buffer.length,
+          width: secured.width,
+          height: secured.height,
+          uploadedAt: Date.now(),
+          albumId,
+        });
+      } catch (e) {
+        await unlink(dest).catch(() => {});
+        throw e;
+      }
 
       saved.push({ name: stored, url: `/i/${stored}`, size: secured.buffer.length, width: secured.width, height: secured.height, thumbUrl: `/api/thumb/${stored}` });
       auditImageSecurity({
@@ -84,6 +119,7 @@ export async function POST(req: NextRequest) {
         width: secured.width,
         height: secured.height,
       });
+      console.info(JSON.stringify({ event: "upload_accepted", userId: user.id, ip, fileName: file.name, storedName: stored, ts: new Date().toISOString() }));
     } catch (error) {
       const message = error instanceof ImageSecurityError ? error.message : "Image failed security processing";
       errors.push({ name: file.name, error: message });
@@ -94,6 +130,7 @@ export async function POST(req: NextRequest) {
         size: file.size,
         reason: message,
       });
+      console.info(JSON.stringify({ event: "upload_rejected", userId: user.id, ip, fileName: file.name, reason: message, ts: new Date().toISOString() }));
     }
   }
 

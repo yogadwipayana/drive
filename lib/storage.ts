@@ -53,9 +53,6 @@ export function safeBaseName(original: string): string {
   return cleaned || "image";
 }
 
-export function randomSuffix(): string {
-  return Math.random().toString(36).slice(2, 8);
-}
 
 const BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 

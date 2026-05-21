@@ -15,7 +15,7 @@ type UserRow = {
   createdAt: number;
 };
 
-const BCRYPT_COST = 10;
+export const BCRYPT_COST = 12;
 
 function newUserId(): string {
   return randomBytes(12).toString("hex");
@@ -64,4 +64,22 @@ export function findUserById(id: string): User | null {
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
+}
+
+/** Verify password and transparently rehash if the stored cost is below BCRYPT_COST. */
+export async function verifyAndRehash(
+  userId: string,
+  password: string,
+  hash: string,
+): Promise<boolean> {
+  const valid = await bcrypt.compare(password, hash);
+  if (!valid) return false;
+  const rounds = bcrypt.getRounds(hash);
+  if (rounds < BCRYPT_COST) {
+    const newHash = await bcrypt.hash(password, BCRYPT_COST);
+    getDb()
+      .prepare("UPDATE users SET passwordHash = ? WHERE id = ?")
+      .run(newHash, userId);
+  }
+  return true;
 }

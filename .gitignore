@@ -5,6 +5,8 @@ uploads
 data
 *.log
 .DS_Store
+.env
+.env.production
 .env*.local
 next-env.d.ts
 tsconfig.tsbuildinfo

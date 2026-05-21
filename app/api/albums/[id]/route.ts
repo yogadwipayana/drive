@@ -31,6 +31,7 @@ export async function GET(
   }
   const album = getAlbumById(id);
   if (!album || album.userId !== user.id) {
+    console.warn(JSON.stringify({ event: "authz_denied", route: "albums/[id]", method: "GET", userId: user.id, albumId: id, ts: new Date().toISOString() }));
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -67,6 +68,7 @@ export async function PATCH(
   }
   const album = getAlbumById(id);
   if (!album || album.userId !== user.id) {
+    console.warn(JSON.stringify({ event: "authz_denied", route: "albums/[id]", method: "PATCH", userId: user.id, albumId: id, ts: new Date().toISOString() }));
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -108,7 +110,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   let user;
@@ -126,6 +128,7 @@ export async function DELETE(
   }
   const album = getAlbumById(id);
   if (!album || album.userId !== user.id) {
+    console.warn(JSON.stringify({ event: "authz_denied", route: "albums/[id]", method: "DELETE", userId: user.id, albumId: id, ts: new Date().toISOString() }));
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

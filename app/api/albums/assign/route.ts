@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     }
     const album = getAlbumById(albumId);
     if (!album || album.userId !== user.id) {
+      console.warn(JSON.stringify({ event: "authz_denied", route: "albums/assign", userId: user.id, albumId, ts: new Date().toISOString() }));
       return NextResponse.json({ error: "Album not found" }, { status: 404 });
     }
     resolvedAlbumId = album.id;
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
   for (const name of names as string[]) {
     const image = getImage(name);
     if (!image || image.userId !== user.id) {
+      console.warn(JSON.stringify({ event: "authz_denied", route: "albums/assign", userId: user.id, storedName: name, ts: new Date().toISOString() }));
       missing.push(name);
       continue;
     }

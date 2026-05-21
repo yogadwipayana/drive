@@ -166,3 +166,12 @@ export function deleteImage(storedName: string): void {
   const db = getDb();
   db.prepare("DELETE FROM images WHERE storedName = ?").run(storedName);
 }
+
+export function getUserStorageBytes(userId: string): number {
+  const row = getDb()
+    .prepare(
+      "SELECT COALESCE(SUM(size), 0) AS total FROM images WHERE userId = ? AND deletedAt IS NULL",
+    )
+    .get(userId) as { total: number };
+  return row.total;
+}

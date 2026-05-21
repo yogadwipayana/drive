@@ -23,6 +23,7 @@ export async function DELETE(req: NextRequest) {
 
   const image = getImage(name);
   if (!image || image.userId !== user.id) {
+    console.warn(JSON.stringify({ event: "authz_denied", route: "delete", userId: user.id, storedName: name, ip: req.headers.get("x-forwarded-for") ?? "unknown", ts: new Date().toISOString() }));
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

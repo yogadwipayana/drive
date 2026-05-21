@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getDb } from "./db";
@@ -16,24 +16,32 @@ export class AuthError extends Error {
   }
 }
 
-function newSessionId(): string {
+function newSessionToken(): string {
   return randomBytes(32).toString("hex");
+}
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 export function createSession(userId: string): { id: string; expiresAt: number } {
   const db = getDb();
-  const id = newSessionId();
+  const token = newSessionToken();
+  const hashedId = hashToken(token);
   const now = Date.now();
   const expiresAt = now + SESSION_TTL_MS;
   db.prepare(
     "INSERT INTO sessions (id, userId, createdAt, expiresAt) VALUES (?, ?, ?, ?)",
-  ).run(id, userId, now, expiresAt);
-  return { id, expiresAt };
+  ).run(hashedId, userId, now, expiresAt);
+  purgeExpired();
+  // Return the raw token as the cookie value; only the hash is stored in DB.
+  return { id: token, expiresAt };
 }
 
 export function destroySession(sessionId: string): void {
   const db = getDb();
-  db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
+  // sessionId here is the raw cookie token; hash it to find the DB row.
+  db.prepare("DELETE FROM sessions WHERE id = ?").run(hashToken(sessionId));
 }
 
 function purgeExpiredSessions(): void {
@@ -43,18 +51,38 @@ function purgeExpiredSessions(): void {
 
 export async function getCurrentUser(): Promise<User | null> {
   const jar = await cookies();
-  const sid = jar.get(SESSION_COOKIE)?.value;
-  if (!sid) return null;
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
 
+  const hashedToken = hashToken(token);
   const db = getDb();
   const row = db
     .prepare("SELECT userId, expiresAt FROM sessions WHERE id = ?")
-    .get(sid) as { userId: string; expiresAt: number } | undefined;
+    .get(hashedToken) as { userId: string; expiresAt: number } | undefined;
   if (!row) return null;
-  if (row.expiresAt < Date.now()) {
-    destroySession(sid);
+
+  const now = Date.now();
+  if (row.expiresAt < now) {
+    destroySession(token);
     return null;
   }
+
+  // Sliding expiry: if more than half the TTL has elapsed, extend the session.
+  const halfTtl = SESSION_TTL_MS / 2;
+  if (row.expiresAt - now < halfTtl) {
+    const newExpiresAt = now + SESSION_TTL_MS;
+    db.prepare("UPDATE sessions SET expiresAt = ? WHERE id = ?").run(newExpiresAt, hashedToken);
+    // Re-set the cookie with the extended expiry (token itself is unchanged).
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true,
+      path: "/",
+      expires: new Date(newExpiresAt),
+    });
+  }
+
   return findUserById(row.userId);
 }
 
@@ -80,7 +108,7 @@ export function setSessionCookie(res: NextResponse, sessionId: string, expiresAt
   res.cookies.set(SESSION_COOKIE, sessionId, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     path: "/",
     expires: new Date(expiresAt),
   });
@@ -90,7 +118,7 @@ export function clearSessionCookie(res: NextResponse): void {
   res.cookies.set(SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     path: "/",
     maxAge: 0,
   });

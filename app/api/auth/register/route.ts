@@ -9,8 +9,19 @@ import {
   findUserByEmail,
 } from "@/lib/users";
 import { createSession, setSessionCookie } from "@/lib/auth";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // IP rate limit: 5 registrations per IP per hour
+  const ip = clientIp(req);
+  const ipLimit = checkRateLimit(`register:${ip}`, { max: 5, windowMs: 60 * 60 * 1000 });
+  if (!ipLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(ipLimit.retryAfterSec) } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -41,6 +52,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (findUserByEmail(email)) {
+    console.warn(
+      JSON.stringify({
+        event: "auth_register_conflict",
+        email,
+        ip,
+        ts: new Date().toISOString(),
+      }),
+    );
     return NextResponse.json({ error: "Email already in use" }, { status: 409 });
   }
 
