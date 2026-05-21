@@ -6,6 +6,9 @@ import {
   contentTypeForExt,
   isSafeStoredName,
 } from "@/lib/storage";
+import { getImage } from "@/lib/metadata";
+import { getAlbumById } from "@/lib/albums";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -18,6 +21,17 @@ export async function GET(
   if (!isSafeStoredName(name)) {
     return new Response("Bad request", { status: 400 });
   }
+
+  const meta = getImage(name);
+  if (!meta) return new Response("Not found", { status: 404 });
+  const user = await getCurrentUser();
+  const isOwner = user && meta.userId === user.id;
+  let isPublic = false;
+  if (!isOwner && meta.albumId) {
+    const album = getAlbumById(meta.albumId);
+    isPublic = !!album?.isPublic;
+  }
+  if (!isOwner && !isPublic) return new Response("Not found", { status: 404 });
 
   const filePath = path.join(UPLOAD_DIR, name);
   const resolved = path.resolve(filePath);

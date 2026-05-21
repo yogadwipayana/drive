@@ -1,11 +1,8 @@
-import path from "node:path";
-import { mkdir, readFile, writeFile, unlink, readdir } from "node:fs/promises";
-import { UPLOAD_DIR, isSafeStoredName } from "./storage";
-
-export const META_DIR = path.join(UPLOAD_DIR, ".meta");
+import { getDb } from "./db";
 
 export type ImageMetadata = {
   storedName: string;
+  userId: string;
   originalName: string;
   mime: string;
   size: number;
@@ -15,68 +12,110 @@ export type ImageMetadata = {
   albumId?: string;
 };
 
-export async function ensureMetaDir(): Promise<void> {
-  await mkdir(META_DIR, { recursive: true });
+type ImageRow = {
+  storedName: string;
+  userId: string;
+  originalName: string;
+  mime: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  uploadedAt: number;
+  albumId: string | null;
+};
+
+function rowToMeta(row: ImageRow): ImageMetadata {
+  return {
+    storedName: row.storedName,
+    userId: row.userId,
+    originalName: row.originalName,
+    mime: row.mime,
+    size: row.size,
+    width: row.width ?? undefined,
+    height: row.height ?? undefined,
+    uploadedAt: row.uploadedAt,
+    albumId: row.albumId ?? undefined,
+  };
 }
 
-function metaPathFor(storedName: string): string {
-  return path.join(META_DIR, `${storedName}.json`);
-}
-
-export async function writeMetadata(meta: ImageMetadata): Promise<void> {
-  await ensureMetaDir();
-  await writeFile(metaPathFor(meta.storedName), JSON.stringify(meta, null, 2), "utf8");
-}
-
-export async function readMetadata(storedName: string): Promise<ImageMetadata | null> {
-  if (!isSafeStoredName(storedName)) return null;
-  try {
-    const raw = await readFile(metaPathFor(storedName), "utf8");
-    return JSON.parse(raw) as ImageMetadata;
-  } catch {
-    return null;
-  }
-}
-
-export async function deleteMetadata(storedName: string): Promise<void> {
-  try {
-    await unlink(metaPathFor(storedName));
-  } catch {
-    // best-effort
-  }
-}
-
-export async function updateMetadata(
-  storedName: string,
-  patch: Partial<ImageMetadata>,
-): Promise<ImageMetadata | null> {
-  const existing = await readMetadata(storedName);
-  if (!existing) return null;
-  const merged: ImageMetadata = { ...existing, ...patch, storedName: existing.storedName };
-  await writeMetadata(merged);
-  return merged;
-}
-
-export async function listMetadata(): Promise<Map<string, ImageMetadata>> {
-  await ensureMetaDir();
-  const out = new Map<string, ImageMetadata>();
-  let entries: string[];
-  try {
-    entries = await readdir(META_DIR);
-  } catch {
-    return out;
-  }
-  await Promise.all(
-    entries.map(async (entry) => {
-      if (!entry.endsWith(".json")) return;
-      try {
-        const raw = await readFile(path.join(META_DIR, entry), "utf8");
-        const parsed = JSON.parse(raw) as ImageMetadata;
-        if (parsed.storedName) out.set(parsed.storedName, parsed);
-      } catch {
-        // skip bad files
-      }
-    }),
+export function createImage(meta: ImageMetadata): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO images (storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    meta.storedName,
+    meta.userId,
+    meta.originalName,
+    meta.mime,
+    meta.size,
+    meta.width ?? null,
+    meta.height ?? null,
+    meta.uploadedAt,
+    meta.albumId ?? null,
   );
-  return out;
+}
+
+export function getImage(storedName: string): ImageMetadata | null {
+  const db = getDb();
+  const row = db
+    .prepare(
+      "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE storedName = ?",
+    )
+    .get(storedName) as ImageRow | undefined;
+  return row ? rowToMeta(row) : null;
+}
+
+export function listImagesByUser(
+  userId: string,
+  filter?: { albumId?: string | "none" },
+): ImageMetadata[] {
+  const db = getDb();
+  let rows: ImageRow[];
+  if (filter?.albumId === "none") {
+    rows = db
+      .prepare(
+        "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE userId = ? AND albumId IS NULL",
+      )
+      .all(userId) as ImageRow[];
+  } else if (filter?.albumId) {
+    rows = db
+      .prepare(
+        "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE userId = ? AND albumId = ?",
+      )
+      .all(userId, filter.albumId) as ImageRow[];
+  } else {
+    rows = db
+      .prepare(
+        "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE userId = ?",
+      )
+      .all(userId) as ImageRow[];
+  }
+  return rows.map(rowToMeta);
+}
+
+export function listImagesByAlbum(albumId: string): ImageMetadata[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE albumId = ? ORDER BY uploadedAt DESC",
+    )
+    .all(albumId) as ImageRow[];
+  return rows.map(rowToMeta);
+}
+
+export function updateImageAlbum(
+  storedName: string,
+  albumId: string | null,
+): void {
+  const db = getDb();
+  db.prepare("UPDATE images SET albumId = ? WHERE storedName = ?").run(
+    albumId,
+    storedName,
+  );
+}
+
+export function deleteImage(storedName: string): void {
+  const db = getDb();
+  db.prepare("DELETE FROM images WHERE storedName = ?").run(storedName);
 }

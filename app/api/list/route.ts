@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readdir, stat } from "node:fs/promises";
-import path from "node:path";
-import { UPLOAD_DIR, ensureUploadDir } from "@/lib/storage";
-import { listMetadata } from "@/lib/metadata";
-import { isSafeAlbumId } from "@/lib/albums";
+import { ensureUploadDir } from "@/lib/storage";
+import { listImagesByUser } from "@/lib/metadata";
+import { isSafeAlbumId, getAlbumById } from "@/lib/albums";
+import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +14,15 @@ const VALID_SORT: ReadonlySet<SortKey> = new Set<SortKey>(["date", "name", "size
 const VALID_ORDER: ReadonlySet<Order> = new Set<Order>(["asc", "desc"]);
 
 export async function GET(req: NextRequest) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
+  }
+
   await ensureUploadDir();
 
   const sp = req.nextUrl.searchParams;
@@ -30,49 +38,34 @@ export async function GET(req: NextRequest) {
   const pageSize = Math.min(Math.max(Number.isFinite(pageSizeRaw) ? pageSizeRaw : 60, 1), 200);
 
   const albumParam = sp.get("album");
-  let albumFilter: string | "none" | undefined;
+  let filterOpts: { albumId?: string | "none" } | undefined;
+
   if (albumParam === "none") {
-    albumFilter = "none";
+    filterOpts = { albumId: "none" };
   } else if (albumParam) {
     if (!isSafeAlbumId(albumParam)) {
       return NextResponse.json({ error: "Invalid album" }, { status: 400 });
     }
-    albumFilter = albumParam;
+    const album = getAlbumById(albumParam);
+    if (!album || album.userId !== user.id) {
+      return NextResponse.json({ error: "Album not found" }, { status: 404 });
+    }
+    filterOpts = { albumId: albumParam };
   }
 
-  const [names, meta] = await Promise.all([readdir(UPLOAD_DIR), listMetadata()]);
+  const metaList = listImagesByUser(user.id, filterOpts);
 
-  const items = await Promise.all(
-    names.map(async (name) => {
-      if (name.startsWith(".")) return null;
-      try {
-        const info = await stat(path.join(UPLOAD_DIR, name));
-        if (!info.isFile()) return null;
-        const m = meta.get(name);
-        return {
-          name,
-          url: `/i/${name}`,
-          size: info.size,
-          mtime: m?.uploadedAt ?? info.mtimeMs,
-          thumbUrl: `/api/thumb/${name}`,
-          width: m?.width,
-          height: m?.height,
-          originalName: m?.originalName,
-          albumId: m?.albumId,
-        };
-      } catch {
-        return null;
-      }
-    }),
-  );
-
-  let list = items.filter((v): v is NonNullable<typeof v> => v !== null);
-
-  if (albumFilter === "none") {
-    list = list.filter((it) => !it.albumId);
-  } else if (albumFilter) {
-    list = list.filter((it) => it.albumId === albumFilter);
-  }
+  let list = metaList.map((m) => ({
+    name: m.storedName,
+    url: `/i/${m.storedName}`,
+    size: m.size,
+    mtime: m.uploadedAt,
+    thumbUrl: `/api/thumb/${m.storedName}`,
+    width: m.width,
+    height: m.height,
+    originalName: m.originalName,
+    albumId: m.albumId,
+  }));
 
   if (q) {
     list = list.filter((it) => {

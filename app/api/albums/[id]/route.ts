@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   deleteAlbum,
+  getAlbumById,
   isSafeAlbumId,
-  readAlbum,
   sanitizeAlbumName,
-  writeAlbum,
+  updateAlbum,
 } from "@/lib/albums";
-import { listMetadata, updateMetadata } from "@/lib/metadata";
+import { listImagesByAlbum } from "@/lib/metadata";
+import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,28 +16,35 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
+  }
+
   const { id } = await params;
   if (!isSafeAlbumId(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
-  const album = await readAlbum(id);
-  if (!album) {
+  const album = getAlbumById(id);
+  if (!album || album.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const meta = await listMetadata();
-  const items = Array.from(meta.values())
-    .filter((m) => m.albumId === id)
-    .sort((a, b) => b.uploadedAt - a.uploadedAt)
-    .map((m) => ({
-      name: m.storedName,
-      url: `/i/${m.storedName}`,
-      thumbUrl: `/api/thumb/${m.storedName}`,
-      size: m.size,
-      mtime: m.uploadedAt,
-      width: m.width,
-      height: m.height,
-      originalName: m.originalName,
-    }));
+
+  const images = listImagesByAlbum(id);
+  const items = images.map((m) => ({
+    name: m.storedName,
+    url: `/i/${m.storedName}`,
+    thumbUrl: `/api/thumb/${m.storedName}`,
+    size: m.size,
+    mtime: m.uploadedAt,
+    width: m.width,
+    height: m.height,
+    originalName: m.originalName,
+  }));
   return NextResponse.json({ album, items });
 }
 
@@ -44,30 +52,58 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
+  }
+
   const { id } = await params;
   if (!isSafeAlbumId(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
-  const album = await readAlbum(id);
-  if (!album) {
+  const album = getAlbumById(id);
+  if (!album || album.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
   let body: unknown;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const rawName = (body as { name?: unknown })?.name;
-  if (typeof rawName !== "string") {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
+
+  const { name: rawName, isPublic: rawIsPublic } = body as { name?: unknown; isPublic?: unknown };
+
+  if (rawName === undefined && rawIsPublic === undefined) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
-  const name = sanitizeAlbumName(rawName);
-  if (!name) {
-    return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
+
+  const patch: { name?: string; isPublic?: boolean } = {};
+
+  if (rawName !== undefined) {
+    if (typeof rawName !== "string") {
+      return NextResponse.json({ error: "name must be a string" }, { status: 400 });
+    }
+    const name = sanitizeAlbumName(rawName);
+    if (!name) {
+      return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
+    }
+    patch.name = name;
   }
-  const updated = { ...album, name };
-  await writeAlbum(updated);
+
+  if (rawIsPublic !== undefined) {
+    if (typeof rawIsPublic !== "boolean") {
+      return NextResponse.json({ error: "isPublic must be a boolean" }, { status: 400 });
+    }
+    patch.isPublic = rawIsPublic;
+  }
+
+  const updated = updateAlbum(id, patch);
   return NextResponse.json({ album: updated });
 }
 
@@ -75,20 +111,24 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
+  }
+
   const { id } = await params;
   if (!isSafeAlbumId(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
-  const album = await readAlbum(id);
-  if (!album) {
+  const album = getAlbumById(id);
+  if (!album || album.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const meta = await listMetadata();
-  await Promise.all(
-    Array.from(meta.values())
-      .filter((m) => m.albumId === id)
-      .map((m) => updateMetadata(m.storedName, { albumId: undefined })),
-  );
-  await deleteAlbum(id);
+
+  deleteAlbum(id);
   return NextResponse.json({ ok: true });
 }

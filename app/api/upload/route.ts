@@ -7,12 +7,22 @@ import {
   secureImageUpload,
 } from "@/lib/image-security";
 import { UPLOAD_DIR, ensureUploadDir, shortId, safeBaseName } from "@/lib/storage";
-import { writeMetadata } from "@/lib/metadata";
-import { isSafeAlbumId, readAlbum } from "@/lib/albums";
+import { createImage } from "@/lib/metadata";
+import { isSafeAlbumId, getAlbumById } from "@/lib/albums";
+import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
+  }
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -31,8 +41,8 @@ export async function POST(req: NextRequest) {
     if (!isSafeAlbumId(albumIdRaw)) {
       return NextResponse.json({ error: "Invalid albumId" }, { status: 400 });
     }
-    const album = await readAlbum(albumIdRaw);
-    if (!album) {
+    const album = getAlbumById(albumIdRaw);
+    if (!album || album.userId !== user.id) {
       return NextResponse.json({ error: "Album not found" }, { status: 404 });
     }
     albumId = album.id;
@@ -52,8 +62,9 @@ export async function POST(req: NextRequest) {
 
       await writeFile(dest, secured.buffer, { flag: "wx" });
 
-      await writeMetadata({
+      createImage({
         storedName: stored,
+        userId: user.id,
         originalName: file.name,
         mime: secured.mime,
         size: secured.buffer.length,

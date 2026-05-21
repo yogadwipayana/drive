@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
-import { isSafeAlbumId, readAlbum } from "@/lib/albums";
-import { listMetadata } from "@/lib/metadata";
+import { isSafeAlbumId, getAlbumById } from "@/lib/albums";
+import { listImagesByAlbum } from "@/lib/metadata";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,13 +31,15 @@ export default async function AlbumSharePage({
   const { id } = await params;
   if (!isSafeAlbumId(id)) notFound();
 
-  const album = await readAlbum(id);
+  const album = getAlbumById(id);
   if (!album) notFound();
 
-  const meta = await listMetadata();
-  const items: ShareItem[] = Array.from(meta.values())
-    .filter((m) => m.albumId === id)
-    .sort((a, b) => b.uploadedAt - a.uploadedAt)
+  if (!album.isPublic) {
+    const user = await getCurrentUser();
+    if (!user || user.id !== album.userId) notFound();
+  }
+
+  const items: ShareItem[] = listImagesByAlbum(id)
     .map((m) => ({
       name: m.storedName,
       url: `/i/${m.storedName}`,

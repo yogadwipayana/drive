@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSafeAlbumId, readAlbum } from "@/lib/albums";
-import { readMetadata, updateMetadata } from "@/lib/metadata";
+import { isSafeAlbumId, getAlbumById } from "@/lib/albums";
+import { getImage, updateImageAlbum } from "@/lib/metadata";
 import { isSafeStoredName } from "@/lib/storage";
+import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -22,15 +32,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let resolvedAlbumId: string | undefined;
+  let resolvedAlbumId: string | null = null;
   if (albumId === null || albumId === "" || typeof albumId === "undefined") {
-    resolvedAlbumId = undefined;
+    resolvedAlbumId = null;
   } else if (typeof albumId === "string") {
     if (!isSafeAlbumId(albumId)) {
       return NextResponse.json({ error: "Invalid albumId" }, { status: 400 });
     }
-    const album = await readAlbum(albumId);
-    if (!album) {
+    const album = getAlbumById(albumId);
+    if (!album || album.userId !== user.id) {
       return NextResponse.json({ error: "Album not found" }, { status: 404 });
     }
     resolvedAlbumId = album.id;
@@ -41,12 +51,12 @@ export async function POST(req: NextRequest) {
   const updated: string[] = [];
   const missing: string[] = [];
   for (const name of names as string[]) {
-    const existing = await readMetadata(name);
-    if (!existing) {
+    const image = getImage(name);
+    if (!image || image.userId !== user.id) {
       missing.push(name);
       continue;
     }
-    await updateMetadata(name, { albumId: resolvedAlbumId });
+    updateImageAlbum(name, resolvedAlbumId);
     updated.push(name);
   }
 

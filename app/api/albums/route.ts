@@ -1,31 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  Album,
-  ensureAlbumDir,
-  listAlbums,
-  newAlbumId,
+  createAlbum,
+  listAlbumsByUser,
   sanitizeAlbumName,
-  writeAlbum,
 } from "@/lib/albums";
-import { listMetadata } from "@/lib/metadata";
+import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  await ensureAlbumDir();
-  const [albums, meta] = await Promise.all([listAlbums(), listMetadata()]);
-
-  const counts = new Map<string, number>();
-  for (const m of meta.values()) {
-    if (m.albumId) counts.set(m.albumId, (counts.get(m.albumId) ?? 0) + 1);
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
   }
 
-  const items = albums.map((a) => ({ ...a, count: counts.get(a.id) ?? 0 }));
+  const items = listAlbumsByUser(user.id);
   return NextResponse.json({ items });
 }
 
 export async function POST(req: NextRequest) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch (e) {
+    const r = authErrorResponse(e);
+    if (r) return r;
+    throw e;
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -41,11 +48,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
   }
 
-  const album: Album = {
-    id: newAlbumId(),
-    name,
-    createdAt: Date.now(),
-  };
-  await writeAlbum(album);
+  const album = createAlbum(user.id, name);
   return NextResponse.json({ album });
 }

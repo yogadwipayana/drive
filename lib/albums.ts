@@ -1,13 +1,19 @@
-import path from "node:path";
-import { mkdir, readFile, writeFile, unlink, readdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
-import { UPLOAD_DIR } from "./storage";
-
-export const ALBUM_DIR = path.join(UPLOAD_DIR, ".albums");
+import { getDb } from "./db";
 
 export type Album = {
   id: string;
+  userId: string;
   name: string;
+  isPublic: boolean;
+  createdAt: number;
+};
+
+type AlbumRow = {
+  id: string;
+  userId: string;
+  name: string;
+  isPublic: number;
   createdAt: number;
 };
 
@@ -24,61 +30,75 @@ export function isSafeAlbumId(id: string): boolean {
   return /^[A-Za-z0-9]{4,32}$/.test(id);
 }
 
-export async function ensureAlbumDir(): Promise<void> {
-  await mkdir(ALBUM_DIR, { recursive: true });
-}
-
-function albumPath(id: string): string {
-  return path.join(ALBUM_DIR, `${id}.json`);
-}
-
-export async function writeAlbum(album: Album): Promise<void> {
-  await ensureAlbumDir();
-  await writeFile(albumPath(album.id), JSON.stringify(album, null, 2), "utf8");
-}
-
-export async function readAlbum(id: string): Promise<Album | null> {
-  if (!isSafeAlbumId(id)) return null;
-  try {
-    const raw = await readFile(albumPath(id), "utf8");
-    return JSON.parse(raw) as Album;
-  } catch {
-    return null;
-  }
-}
-
-export async function deleteAlbum(id: string): Promise<void> {
-  if (!isSafeAlbumId(id)) return;
-  try {
-    await unlink(albumPath(id));
-  } catch {
-    // best-effort
-  }
-}
-
-export async function listAlbums(): Promise<Album[]> {
-  await ensureAlbumDir();
-  let entries: string[];
-  try {
-    entries = await readdir(ALBUM_DIR);
-  } catch {
-    return [];
-  }
-  const items = await Promise.all(
-    entries
-      .filter((e) => e.endsWith(".json"))
-      .map(async (entry) => {
-        try {
-          const raw = await readFile(path.join(ALBUM_DIR, entry), "utf8");
-          return JSON.parse(raw) as Album;
-        } catch {
-          return null;
-        }
-      }),
-  );
-  return items.filter((a): a is Album => a !== null).sort((a, b) => b.createdAt - a.createdAt);
-}
-
 export function sanitizeAlbumName(input: string): string {
   return input.trim().replace(/\s+/g, " ").slice(0, 80);
+}
+
+function rowToAlbum(row: AlbumRow): Album {
+  return {
+    id: row.id,
+    userId: row.userId,
+    name: row.name,
+    isPublic: row.isPublic === 1,
+    createdAt: row.createdAt,
+  };
+}
+
+export function createAlbum(userId: string, name: string): Album {
+  const db = getDb();
+  const id = newAlbumId();
+  const createdAt = Date.now();
+  db.prepare(
+    "INSERT INTO albums (id, userId, name, isPublic, createdAt) VALUES (?, ?, ?, 0, ?)",
+  ).run(id, userId, name, createdAt);
+  return { id, userId, name, isPublic: false, createdAt };
+}
+
+export function getAlbumById(id: string): Album | null {
+  if (!isSafeAlbumId(id)) return null;
+  const db = getDb();
+  const row = db
+    .prepare("SELECT id, userId, name, isPublic, createdAt FROM albums WHERE id = ?")
+    .get(id) as AlbumRow | undefined;
+  return row ? rowToAlbum(row) : null;
+}
+
+export function listAlbumsByUser(
+  userId: string,
+): Array<Album & { count: number }> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT a.id, a.userId, a.name, a.isPublic, a.createdAt,
+              (SELECT COUNT(*) FROM images i WHERE i.albumId = a.id) AS count
+       FROM albums a
+       WHERE a.userId = ?
+       ORDER BY a.createdAt DESC`,
+    )
+    .all(userId) as Array<AlbumRow & { count: number }>;
+  return rows.map((r) => ({ ...rowToAlbum(r), count: r.count }));
+}
+
+export function updateAlbum(
+  id: string,
+  patch: { name?: string; isPublic?: boolean },
+): Album | null {
+  const db = getDb();
+  const existing = getAlbumById(id);
+  if (!existing) return null;
+  const name = patch.name ?? existing.name;
+  const isPublic =
+    patch.isPublic === undefined ? existing.isPublic : patch.isPublic;
+  db.prepare("UPDATE albums SET name = ?, isPublic = ? WHERE id = ?").run(
+    name,
+    isPublic ? 1 : 0,
+    id,
+  );
+  return { ...existing, name, isPublic };
+}
+
+export function deleteAlbum(id: string): void {
+  if (!isSafeAlbumId(id)) return;
+  const db = getDb();
+  db.prepare("DELETE FROM albums WHERE id = ?").run(id);
 }
