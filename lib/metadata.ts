@@ -10,6 +10,8 @@ export type ImageMetadata = {
   height?: number;
   uploadedAt: number;
   albumId?: string;
+  isPublic?: boolean;
+  deletedAt?: number;
 };
 
 type ImageRow = {
@@ -22,7 +24,12 @@ type ImageRow = {
   height: number | null;
   uploadedAt: number;
   albumId: string | null;
+  isPublic: number;
+  deletedAt: number | null;
 };
+
+const SELECT_COLS =
+  "storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId, isPublic, deletedAt";
 
 function rowToMeta(row: ImageRow): ImageMetadata {
   return {
@@ -35,14 +42,16 @@ function rowToMeta(row: ImageRow): ImageMetadata {
     height: row.height ?? undefined,
     uploadedAt: row.uploadedAt,
     albumId: row.albumId ?? undefined,
+    isPublic: row.isPublic === 1,
+    deletedAt: row.deletedAt ?? undefined,
   };
 }
 
 export function createImage(meta: ImageMetadata): void {
   const db = getDb();
   db.prepare(
-    `INSERT INTO images (storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO images (storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId, isPublic)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     meta.storedName,
     meta.userId,
@@ -53,15 +62,20 @@ export function createImage(meta: ImageMetadata): void {
     meta.height ?? null,
     meta.uploadedAt,
     meta.albumId ?? null,
+    meta.isPublic ? 1 : 0,
   );
 }
 
-export function getImage(storedName: string): ImageMetadata | null {
+export function getImage(
+  storedName: string,
+  opts?: { includeDeleted?: boolean },
+): ImageMetadata | null {
   const db = getDb();
+  const where = opts?.includeDeleted
+    ? "storedName = ?"
+    : "storedName = ? AND deletedAt IS NULL";
   const row = db
-    .prepare(
-      "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE storedName = ?",
-    )
+    .prepare(`SELECT ${SELECT_COLS} FROM images WHERE ${where}`)
     .get(storedName) as ImageRow | undefined;
   return row ? rowToMeta(row) : null;
 }
@@ -75,19 +89,19 @@ export function listImagesByUser(
   if (filter?.albumId === "none") {
     rows = db
       .prepare(
-        "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE userId = ? AND albumId IS NULL",
+        `SELECT ${SELECT_COLS} FROM images WHERE userId = ? AND albumId IS NULL AND deletedAt IS NULL`,
       )
       .all(userId) as ImageRow[];
   } else if (filter?.albumId) {
     rows = db
       .prepare(
-        "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE userId = ? AND albumId = ?",
+        `SELECT ${SELECT_COLS} FROM images WHERE userId = ? AND albumId = ? AND deletedAt IS NULL`,
       )
       .all(userId, filter.albumId) as ImageRow[];
   } else {
     rows = db
       .prepare(
-        "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE userId = ?",
+        `SELECT ${SELECT_COLS} FROM images WHERE userId = ? AND deletedAt IS NULL`,
       )
       .all(userId) as ImageRow[];
   }
@@ -98,9 +112,19 @@ export function listImagesByAlbum(albumId: string): ImageMetadata[] {
   const db = getDb();
   const rows = db
     .prepare(
-      "SELECT storedName, userId, originalName, mime, size, width, height, uploadedAt, albumId FROM images WHERE albumId = ? ORDER BY uploadedAt DESC",
+      `SELECT ${SELECT_COLS} FROM images WHERE albumId = ? AND deletedAt IS NULL ORDER BY uploadedAt DESC`,
     )
     .all(albumId) as ImageRow[];
+  return rows.map(rowToMeta);
+}
+
+export function listTrashedByUser(userId: string): ImageMetadata[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT ${SELECT_COLS} FROM images WHERE userId = ? AND deletedAt IS NOT NULL ORDER BY deletedAt DESC`,
+    )
+    .all(userId) as ImageRow[];
   return rows.map(rowToMeta);
 }
 
@@ -111,6 +135,29 @@ export function updateImageAlbum(
   const db = getDb();
   db.prepare("UPDATE images SET albumId = ? WHERE storedName = ?").run(
     albumId,
+    storedName,
+  );
+}
+
+export function setImagePublic(storedName: string, isPublic: boolean): void {
+  const db = getDb();
+  db.prepare("UPDATE images SET isPublic = ? WHERE storedName = ?").run(
+    isPublic ? 1 : 0,
+    storedName,
+  );
+}
+
+export function softDeleteImage(storedName: string, at: number = Date.now()): void {
+  const db = getDb();
+  db.prepare("UPDATE images SET deletedAt = ? WHERE storedName = ?").run(
+    at,
+    storedName,
+  );
+}
+
+export function restoreImage(storedName: string): void {
+  const db = getDb();
+  db.prepare("UPDATE images SET deletedAt = NULL WHERE storedName = ?").run(
     storedName,
   );
 }

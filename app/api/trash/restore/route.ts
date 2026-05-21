@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSafeStoredName } from "@/lib/storage";
-import { getImage, softDeleteImage } from "@/lib/metadata";
+import { getImage, restoreImage } from "@/lib/metadata";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -35,19 +35,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const deleted: string[] = [];
+  const restored: string[] = [];
   const missing: string[] = [];
-  const at = Date.now();
 
   for (const name of names as string[]) {
-    const image = getImage(name);
-    if (!image || image.userId !== user.id) {
+    const image = getImage(name, { includeDeleted: true });
+    if (!image || image.userId !== user.id || !image.deletedAt) {
       missing.push(name);
       continue;
     }
-    softDeleteImage(name, at);
-    deleted.push(name);
+    restoreImage(name);
+    restored.push(name);
   }
 
-  return NextResponse.json({ deleted, missing, failed: [] });
+  return NextResponse.json({ restored, missing });
 }
