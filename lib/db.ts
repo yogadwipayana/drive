@@ -53,7 +53,6 @@ CREATE TABLE IF NOT EXISTS images (
 CREATE INDEX IF NOT EXISTS idx_images_userId ON images(userId);
 CREATE INDEX IF NOT EXISTS idx_images_albumId ON images(albumId);
 CREATE INDEX IF NOT EXISTS idx_images_uploadedAt ON images(uploadedAt);
-CREATE INDEX IF NOT EXISTS idx_images_deletedAt ON images(deletedAt);
 `;
 
 let dbInstance: Database.Database | null = null;
@@ -88,8 +87,8 @@ function init(): Database.Database {
   }
   if (!imageCols.some((c) => c.name === "deletedAt")) {
     db.exec("ALTER TABLE images ADD COLUMN deletedAt INTEGER");
-    db.exec("CREATE INDEX IF NOT EXISTS idx_images_deletedAt ON images(deletedAt)");
   }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_images_deletedAt ON images(deletedAt)");
 
   if (isFirstRun) {
     db.prepare(
