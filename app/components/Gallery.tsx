@@ -605,6 +605,9 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
         onCreateAlbum={createAlbum}
         onRenameAlbum={renameAlbum}
         onDeleteAlbum={deleteAlbum}
+        onRefresh={() => {
+          void Promise.all([loadFirstPage(), refreshAlbums()]);
+        }}
         onCloseMobile={() => setMobileOpen(false)}
       />
 
