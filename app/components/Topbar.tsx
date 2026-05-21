@@ -1,6 +1,8 @@
 "use client";
 
 import { Dropdown } from "./Dropdown";
+import { MenuIcon, SearchIcon } from "./icons";
+import { ThemeToggle } from "./ThemeToggle";
 
 type SortKey = "date" | "name" | "size";
 type Order = "asc" | "desc";
@@ -45,56 +47,65 @@ export function Topbar({
 }: TopbarProps) {
   return (
     <header className="topbar">
+      {/* Mobile hamburger — CSS hides this on wider viewports */}
       <button
+        type="button"
         className="topbar-menu-btn"
         onClick={onOpenMobileMenu}
         aria-label="Open menu"
       >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-          <rect y="3" width="18" height="2" fill="currentColor" />
-          <rect y="8" width="18" height="2" fill="currentColor" />
-          <rect y="13" width="18" height="2" fill="currentColor" />
-        </svg>
+        <MenuIcon />
       </button>
 
+      {/* Section title — CSS hides this on narrow viewports */}
       <div className="topbar-title-block">
         <span className="topbar-title">{title}</span>
         {count > 0 && <span className="topbar-count">{count}</span>}
       </div>
 
-      <div className="topbar-spacer" />
-
-      <input
-        className="topbar-search"
-        type="search"
-        placeholder="Search by filename…"
-        value={query}
-        onChange={(e) => onQueryChange(e.target.value)}
-      />
-
-      <div className="topbar-sort">
-        <Dropdown
-          value={sort}
-          onChange={(v) => onSortChange(v as SortKey)}
-          options={SORT_OPTIONS}
-          ariaLabel="Sort by"
-          size="sm"
-        />
-        <Dropdown
-          value={order}
-          onChange={(v) => onOrderChange(v as Order)}
-          options={ORDER_OPTIONS}
-          ariaLabel="Order"
-          size="sm"
+      {/* Search field */}
+      <div className="topbar-search-wrap">
+        <span className="topbar-search-icon">
+          <SearchIcon />
+        </span>
+        <input
+          className="topbar-search"
+          type="search"
+          placeholder="Search in Drive"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
         />
       </div>
 
-      <button
-        className={`btn${selecting ? " btn-active" : ""}`}
-        onClick={onToggleSelecting}
-      >
-        {selecting ? "Done" : "Select"}
-      </button>
+      {/* Right-side actions */}
+      <div className="topbar-actions">
+        <div className="topbar-sort">
+          <Dropdown
+            value={sort}
+            onChange={(v) => onSortChange(v as SortKey)}
+            options={SORT_OPTIONS}
+            ariaLabel="Sort by"
+            size="sm"
+          />
+          <Dropdown
+            value={order}
+            onChange={(v) => onOrderChange(v as Order)}
+            options={ORDER_OPTIONS}
+            ariaLabel="Order"
+            size="sm"
+          />
+        </div>
+
+        <button
+          type="button"
+          className={`btn btn-sm${selecting ? " btn-active" : ""}`}
+          onClick={onToggleSelecting}
+        >
+          {selecting ? "Done" : "Select"}
+        </button>
+
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

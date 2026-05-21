@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export type ContextMenuItem =
   | {
       kind: "item";
       label: string;
       onSelect: () => void;
+      icon?: ReactNode;
+      shortcut?: string;
       danger?: boolean;
       disabled?: boolean;
     }
@@ -14,6 +16,7 @@ export type ContextMenuItem =
   | {
       kind: "submenu";
       label: string;
+      icon?: ReactNode;
       options: { value: string; label: string }[];
       onSelect: (value: string) => void;
     };
@@ -82,14 +85,20 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
               key={`sub-${i}`}
               className="ctx-row ctx-submenu-row"
               onMouseEnter={() => setSubmenuOpen(i)}
-              onMouseLeave={() => setSubmenuOpen((cur) => (cur === i ? null : cur))}
+              onMouseLeave={() =>
+                setSubmenuOpen((cur) => (cur === i ? null : cur))
+              }
             >
-              <span>{item.label}</span>
+              <span className="ctx-row-icon">{item.icon ?? null}</span>
+              <span className="ctx-row-label">{item.label}</span>
               <span className="ctx-submenu-arrow">›</span>
               {open && (
                 <div className="ctx-submenu">
                   {item.options.length === 0 ? (
-                    <div className="ctx-row ctx-row-disabled">No options</div>
+                    <div className="ctx-row ctx-row-disabled">
+                      <span className="ctx-row-icon" />
+                      <span className="ctx-row-label">No options</span>
+                    </div>
                   ) : (
                     item.options.map((opt) => (
                       <button
@@ -101,7 +110,8 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
                           onClose();
                         }}
                       >
-                        {opt.label}
+                        <span className="ctx-row-icon" />
+                        <span className="ctx-row-label">{opt.label}</span>
                       </button>
                     ))
                   )}
@@ -123,7 +133,11 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
               onClose();
             }}
           >
-            {item.label}
+            <span className="ctx-row-icon">{item.icon ?? null}</span>
+            <span className="ctx-row-label">{item.label}</span>
+            {item.shortcut && (
+              <span className="ctx-row-shortcut">{item.shortcut}</span>
+            )}
           </button>
         );
       })}

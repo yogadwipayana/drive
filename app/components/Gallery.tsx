@@ -5,6 +5,15 @@ import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { Dropdown } from "./Dropdown";
 import Sidebar from "./Sidebar";
 import { Topbar } from "./Topbar";
+import {
+  PublicIcon,
+  PrivateIcon,
+  LinkIcon,
+  InfoIcon,
+  MoveIcon,
+  TrashIcon,
+  RestoreIcon,
+} from "./icons";
 
 type Item = {
   name: string;
@@ -797,13 +806,15 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
                               onClick={() => void restoreItem(it.name)}
                               className="btn btn-sm"
                             >
+                              <RestoreIcon size={16} />
                               Restore
                             </button>
                             <button
                               onClick={() => void deleteForever(it.name)}
                               className="btn btn-sm btn-danger"
                             >
-                              Delete forever
+                              <TrashIcon size={16} />
+                              Delete
                             </button>
                           </div>
                         </div>
@@ -1223,11 +1234,13 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
           {
             kind: "item",
             label: it.isPublic ? "Make private" : "Make public",
+            icon: it.isPublic ? <PrivateIcon size={16} /> : <PublicIcon size={16} />,
             onSelect: () => void setItemPublic(it.name, !it.isPublic),
           },
           {
             kind: "item",
             label: "Copy public link",
+            icon: <LinkIcon size={16} />,
             disabled: !it.isPublic,
             onSelect: () => copy(publicUrl),
           },
@@ -1235,16 +1248,19 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
           {
             kind: "item",
             label: "Copy URL",
+            icon: <LinkIcon size={16} />,
             onSelect: () => copy(publicUrl),
           },
           {
             kind: "item",
             label: "View info",
+            icon: <InfoIcon size={16} />,
             onSelect: () => setInfoFor(it),
           },
           {
             kind: "submenu",
             label: "Move to album",
+            icon: <MoveIcon size={16} />,
             options: [
               { value: "__none__", label: "Unfiled" },
               ...albums.map((a) => ({ value: a.id, label: a.name })),
@@ -1256,6 +1272,7 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
           {
             kind: "item",
             label: "Delete",
+            icon: <TrashIcon size={16} />,
             danger: true,
             onSelect: () => void deleteItem(it.name),
           },

@@ -2,6 +2,17 @@
 
 import { useCallback, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import {
+  HomeIcon,
+  TrashIcon,
+  FolderIcon,
+  PlusIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  OpenInNewIcon,
+  RefreshIcon,
+  RenameIcon,
+} from "./icons";
 
 type Album = { id: string; name: string; createdAt: number; count: number };
 type View = "home" | "trash" | "album" | "unfiled";
@@ -33,18 +44,6 @@ type SidebarMenuKind =
   | { kind: "album"; album: Album };
 
 type SidebarMenu = SidebarMenuKind & { x: number; y: number };
-
-const HomeIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M8 1L1 7v8h5v-5h4v5h5V7L8 1z" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M6 2h4l1 1H5L6 2zM2 4h12v1H2V4zm2 2h8l-1 8H5L4 6zm2 1v6h1V7H6zm3 0v6h1V7H9z" />
-  </svg>
-);
 
 export default function Sidebar({
   view,
@@ -90,28 +89,27 @@ export default function Sidebar({
   const [menu, setMenu] = useState<SidebarMenu | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
 
-  const openMenu = useCallback(
-    (e: ReactMouseEvent, m: SidebarMenuKind) => {
-      e.preventDefault();
-      setMenu({ ...m, x: e.clientX, y: e.clientY });
-    },
-    []
-  );
+  const openMenu = useCallback((e: ReactMouseEvent, m: SidebarMenuKind) => {
+    e.preventDefault();
+    setMenu({ ...m, x: e.clientX, y: e.clientY });
+  }, []);
 
   return (
     <>
       <div className="sidebar-backdrop" onClick={onCloseMobile} />
       <aside className={`sidebar${mobileOpen ? " is-open" : ""}`}>
+
+        {/* Brand row */}
         <div className="sidebar-brand">
           <svg
-            className="sidebar-brand-mark"
-            width="22"
-            height="22"
+            className="sidebar-logo-mark"
+            width="28"
+            height="28"
             viewBox="0 0 32 32"
             xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true"
           >
-            <rect width="32" height="32" rx="8" fill="#6ea8ff" />
+            <rect width="32" height="32" rx="8" fill="#1a73e8" />
             <path
               d="M7 23l5.5-7 4 5 4-6 4.5 8H7z"
               stroke="#ffffff"
@@ -129,9 +127,26 @@ export default function Sidebar({
               fill="none"
             />
           </svg>
-          <span>Drive</span>
+          <span className="sidebar-brand-text">
+            <span className="sidebar-brand-name">Vista</span>
+            <span className="sidebar-brand-sub">Image host</span>
+          </span>
         </div>
 
+        {/* + New button */}
+        <button
+          type="button"
+          className="sidebar-new-btn"
+          onClick={onCreateAlbum}
+          aria-label="New album"
+        >
+          <span className="sidebar-new-icon">
+            <PlusIcon size={20} />
+          </span>
+          New
+        </button>
+
+        {/* Nav links */}
         <nav aria-label="Main navigation">
           <ul className="sidebar-nav">
             <li>
@@ -142,7 +157,7 @@ export default function Sidebar({
                 onContextMenu={(e) => openMenu(e, { kind: "home" })}
                 aria-current={view === "home" ? "page" : undefined}
               >
-                <HomeIcon />
+                <HomeIcon size={20} />
                 Home
               </button>
             </li>
@@ -154,22 +169,26 @@ export default function Sidebar({
                 onContextMenu={(e) => openMenu(e, { kind: "trash" })}
                 aria-current={view === "trash" ? "page" : undefined}
               >
-                <TrashIcon />
+                <TrashIcon size={20} />
                 Trash
               </button>
             </li>
           </ul>
         </nav>
 
-        <div className="sidebar-albums-section">
-          <div
-            style={{ display: "flex", alignItems: "center" }}
-            onContextMenu={(e) => {
-              const target = e.target as HTMLElement;
-              if (target.closest(".sidebar-album")) return;
-              openMenu(e, { kind: "albums" });
-            }}
-          >
+        {/* Divider */}
+        <hr className="sidebar-section-divider" />
+
+        {/* Albums section */}
+        <div
+          className="sidebar-albums-section"
+          onContextMenu={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest(".sidebar-album")) return;
+            openMenu(e, { kind: "albums" });
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center" }}>
             <button
               type="button"
               className="sidebar-section-header"
@@ -177,7 +196,11 @@ export default function Sidebar({
               aria-expanded={albumsExpanded}
             >
               <span className={`sidebar-chevron${albumsExpanded ? " is-expanded" : ""}`}>
-                {albumsExpanded ? "▾" : "▸"}
+                {albumsExpanded ? (
+                  <ChevronDownIcon size={16} />
+                ) : (
+                  <ChevronRightIcon size={16} />
+                )}
               </span>
               Albums
             </button>
@@ -187,23 +210,36 @@ export default function Sidebar({
               onClick={onCreateAlbum}
               aria-label="Create new album"
             >
-              +
+              <PlusIcon size={16} />
             </button>
           </div>
 
           {albumsExpanded && (
             <ul className="sidebar-album-list">
+              {/* Unfiled */}
               <li>
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   className={`sidebar-album${view === "unfiled" ? " is-active" : ""}`}
                   onClick={handleUnfiled}
                   onContextMenu={(e) => openMenu(e, { kind: "unfiled" })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleUnfiled();
+                    }
+                  }}
                   aria-current={view === "unfiled" ? "page" : undefined}
                 >
+                  <span style={{ display: "inline-flex", alignItems: "center", marginRight: 6, opacity: 0.7 }}>
+                    <FolderIcon size={16} />
+                  </span>
                   <span className="sidebar-album-name">Unfiled</span>
-                </button>
+                </div>
               </li>
+
+              {/* Albums */}
               {albums.map((album) => {
                 const isActive = view === "album" && activeAlbumId === album.id;
                 return (
@@ -224,6 +260,9 @@ export default function Sidebar({
                       aria-current={isActive ? "page" : undefined}
                       title="Click to open · double-click to rename · right-click for more"
                     >
+                      <span style={{ display: "inline-flex", alignItems: "center", marginRight: 6, opacity: 0.7 }}>
+                        <FolderIcon size={16} />
+                      </span>
                       <span className="sidebar-album-name">{album.name}</span>
                       <span className="sidebar-album-count">{album.count}</span>
                       <button
@@ -245,64 +284,67 @@ export default function Sidebar({
           )}
         </div>
       </aside>
+
+      {/* Context menus */}
       {menu &&
         (() => {
           let items: ContextMenuItem[] = [];
+
           if (menu.kind === "home") {
             items = [
-              { kind: "item", label: "Open", onSelect: handleHome },
-              { kind: "item", label: "Refresh", onSelect: onRefresh },
+              { kind: "item", label: "Open", icon: <OpenInNewIcon size={16} />, onSelect: handleHome },
+              { kind: "item", label: "Refresh", icon: <RefreshIcon size={16} />, onSelect: onRefresh },
               { kind: "separator" },
-              { kind: "item", label: "New album", onSelect: onCreateAlbum },
+              { kind: "item", label: "New album", icon: <PlusIcon size={16} />, onSelect: onCreateAlbum },
             ];
           } else if (menu.kind === "trash") {
             items = [
-              { kind: "item", label: "Open", onSelect: handleTrash },
-              { kind: "item", label: "Refresh", onSelect: onRefresh },
+              { kind: "item", label: "Open", icon: <OpenInNewIcon size={16} />, onSelect: handleTrash },
+              { kind: "item", label: "Refresh", icon: <RefreshIcon size={16} />, onSelect: onRefresh },
               { kind: "separator" },
               {
                 kind: "item",
                 label: "Empty trash",
+                icon: <TrashIcon size={16} />,
                 danger: true,
                 onSelect: onEmptyTrash,
               },
             ];
           } else if (menu.kind === "unfiled") {
             items = [
-              { kind: "item", label: "Open", onSelect: handleUnfiled },
-              { kind: "item", label: "Refresh", onSelect: onRefresh },
+              { kind: "item", label: "Open", icon: <OpenInNewIcon size={16} />, onSelect: handleUnfiled },
+              { kind: "item", label: "Refresh", icon: <RefreshIcon size={16} />, onSelect: onRefresh },
               { kind: "separator" },
-              { kind: "item", label: "New album", onSelect: onCreateAlbum },
+              { kind: "item", label: "New album", icon: <PlusIcon size={16} />, onSelect: onCreateAlbum },
             ];
           } else if (menu.kind === "albums") {
             items = [
-              { kind: "item", label: "New album", onSelect: onCreateAlbum },
+              { kind: "item", label: "New album", icon: <PlusIcon size={16} />, onSelect: onCreateAlbum },
               {
                 kind: "item",
                 label: albumsExpanded ? "Collapse" : "Expand",
+                icon: albumsExpanded ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />,
                 onSelect: onToggleAlbumsExpanded,
               },
               { kind: "separator" },
-              { kind: "item", label: "Refresh", onSelect: onRefresh },
+              { kind: "item", label: "Refresh", icon: <RefreshIcon size={16} />, onSelect: onRefresh },
             ];
           } else if (menu.kind === "album") {
             const a = menu.album;
             items = [
-              { kind: "item", label: "Open", onSelect: () => handleAlbum(a.id) },
-              {
-                kind: "item",
-                label: "Rename",
-                onSelect: () => onRenameAlbum(a.id, a.name),
-              },
+              { kind: "item", label: "Open", icon: <OpenInNewIcon size={16} />, onSelect: () => handleAlbum(a.id) },
+              { kind: "item", label: "Rename", icon: <RenameIcon size={16} />, onSelect: () => onRenameAlbum(a.id, a.name) },
               { kind: "separator" },
               {
                 kind: "item",
                 label: "Delete",
+                icon: <TrashIcon size={16} />,
                 danger: true,
                 onSelect: () => onDeleteAlbum(a.id, a.name),
               },
             ];
           }
+
           return (
             <ContextMenu
               x={menu.x}

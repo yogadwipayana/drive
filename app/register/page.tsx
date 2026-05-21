@@ -43,14 +43,14 @@ export default function RegisterPage() {
         <div className="auth-header">
           <div className="auth-brand">
             <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="32" height="32" rx="8" fill="#6ea8ff"/>
+              <rect width="32" height="32" rx="8" fill="#1a73e8"/>
               <path d="M7 23l5.5-7 4 5 4-6 4.5 8H7z" stroke="#ffffff" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
               <circle cx="11.5" cy="12" r="1.75" stroke="#ffffff" strokeWidth="1.75" fill="none"/>
             </svg>
           </div>
           <div>
-            <h1 className="auth-heading">Create your Drive account</h1>
-            <p className="auth-sub">Start hosting your images in seconds</p>
+            <h1 className="auth-heading">Create account</h1>
+            <p className="auth-sub">Use Vista to host your images</p>
           </div>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>

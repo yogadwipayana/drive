@@ -38,14 +38,14 @@ export default function LoginPage() {
         <div className="auth-header">
           <div className="auth-brand">
             <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="32" height="32" rx="8" fill="#6ea8ff"/>
+              <rect width="32" height="32" rx="8" fill="#1a73e8"/>
               <path d="M7 23l5.5-7 4 5 4-6 4.5 8H7z" stroke="#ffffff" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
               <circle cx="11.5" cy="12" r="1.75" stroke="#ffffff" strokeWidth="1.75" fill="none"/>
             </svg>
           </div>
           <div>
-            <h1 className="auth-heading">Welcome back to Drive</h1>
-            <p className="auth-sub">Sign in to your account</p>
+            <h1 className="auth-heading">Sign in</h1>
+            <p className="auth-sub">to continue to Vista</p>
           </div>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>
