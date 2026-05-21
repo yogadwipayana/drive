@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Image Host",
-  description: "Upload images and share them via URL",
+  title: "Drive",
+  description: "Drive — upload images and share them via URL",
 };
 
 export const viewport = {
