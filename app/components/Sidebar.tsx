@@ -21,6 +21,7 @@ type SidebarProps = {
   onRenameAlbum: (id: string, currentName: string) => void;
   onDeleteAlbum: (id: string, name: string) => void;
   onRefresh: () => void;
+  onEmptyTrash: () => void;
   onCloseMobile: () => void;
 };
 
@@ -60,6 +61,7 @@ export default function Sidebar({
   onRenameAlbum,
   onDeleteAlbum,
   onRefresh,
+  onEmptyTrash,
   onCloseMobile,
 }: SidebarProps) {
   const handleHome = useCallback(() => {
@@ -261,9 +263,8 @@ export default function Sidebar({
               {
                 kind: "item",
                 label: "Empty trash",
-                disabled: true,
                 danger: true,
-                onSelect: () => {},
+                onSelect: onEmptyTrash,
               },
             ];
           } else if (menu.kind === "unfiled") {

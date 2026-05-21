@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { Dropdown } from "./Dropdown";
 import Sidebar from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -15,6 +16,8 @@ type Item = {
   height?: number;
   originalName?: string;
   albumId?: string;
+  isPublic?: boolean;
+  deletedAt?: number;
 };
 
 type Album = {
@@ -122,6 +125,10 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
   const [deleteAlbumBusy, setDeleteAlbumBusy] = useState(false);
   const [deleteAlbumError, setDeleteAlbumError] = useState<string | null>(null);
 
+  const [menu, setMenu] = useState<{ x: number; y: number; item: Item } | null>(
+    null,
+  );
+
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -150,10 +157,16 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
 
   const loadFirstPage = useCallback(async () => {
     if (isTrash) {
-      setItems([]);
-      setTotal(0);
-      setHasMore(false);
-      setPage(1);
+      try {
+        const res = await fetch("/api/trash", { cache: "no-store" });
+        const data = await res.json();
+        setItems(data.items ?? []);
+        setTotal(data.total ?? 0);
+        setHasMore(false);
+        setPage(1);
+      } catch {
+        // ignore
+      }
       return;
     }
     try {
@@ -348,7 +361,6 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
 
   const deleteItem = useCallback(
     async (name: string) => {
-      if (!confirm(`Delete ${name}?`)) return;
       try {
         const res = await fetch(`/api/delete?name=${encodeURIComponent(name)}`, {
           method: "DELETE",
@@ -364,6 +376,61 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
     },
     [loadFirstPage, refreshAlbums],
   );
+
+  const restoreItem = useCallback(
+    async (name: string) => {
+      try {
+        const res = await fetch("/api/trash/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ names: [name] }),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || `Restore failed (${res.status})`);
+        }
+        await Promise.all([loadFirstPage(), refreshAlbums()]);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Restore failed");
+      }
+    },
+    [loadFirstPage, refreshAlbums],
+  );
+
+  const deleteForever = useCallback(
+    async (name: string) => {
+      if (!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
+      try {
+        const res = await fetch("/api/trash/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ names: [name] }),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || `Delete failed (${res.status})`);
+        }
+        await loadFirstPage();
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Delete failed");
+      }
+    },
+    [loadFirstPage],
+  );
+
+  const emptyTrash = useCallback(async () => {
+    if (!confirm("Permanently delete all items in trash? This cannot be undone.")) return;
+    try {
+      const res = await fetch("/api/trash/empty", { method: "POST" });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `Empty trash failed (${res.status})`);
+      }
+      await loadFirstPage();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Empty trash failed");
+    }
+  }, [loadFirstPage]);
 
   const toggleSelected = useCallback((name: string) => {
     setSelected((prev) => {
@@ -544,6 +611,53 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
     [refreshAlbums],
   );
 
+  const setItemPublic = useCallback(
+    async (name: string, isPublic: boolean) => {
+      setItems((prev) =>
+        prev.map((it) => (it.name === name ? { ...it, isPublic } : it)),
+      );
+      try {
+        const res = await fetch(`/api/images/${encodeURIComponent(name)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublic }),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || `Update failed (${res.status})`);
+        }
+      } catch (e: unknown) {
+        setItems((prev) =>
+          prev.map((it) =>
+            it.name === name ? { ...it, isPublic: !isPublic } : it,
+          ),
+        );
+        setError(e instanceof Error ? e.message : "Update failed");
+      }
+    },
+    [],
+  );
+
+  const assignItemToAlbum = useCallback(
+    async (name: string, albumId: string | null) => {
+      try {
+        const res = await fetch("/api/albums/assign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ names: [name], albumId }),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || `Assign failed (${res.status})`);
+        }
+        await Promise.all([loadFirstPage(), refreshAlbums()]);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Assign failed");
+      }
+    },
+    [loadFirstPage, refreshAlbums],
+  );
+
   const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -578,6 +692,7 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
           : "Home";
 
   return (
+    <>
     <div className="shell">
       <Sidebar
         view={view}
@@ -608,6 +723,7 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
         onRefresh={() => {
           void Promise.all([loadFirstPage(), refreshAlbums()]);
         }}
+        onEmptyTrash={emptyTrash}
         onCloseMobile={() => setMobileOpen(false)}
       />
 
@@ -637,10 +753,66 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
 
         <div className="main-content">
           {view === "trash" ? (
-            <div className="trash-empty">
-              <div className="trash-empty-title">Trash is empty</div>
-              <p>Deleted images will appear here.</p>
-            </div>
+            <main className="page">
+              <div className="album-bar">
+                <span className="album-bar-label">
+                  Trash · <strong>{total}</strong> {total === 1 ? "item" : "items"}
+                </span>
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={() => void emptyTrash()}
+                  disabled={items.length === 0}
+                >
+                  Empty trash
+                </button>
+              </div>
+
+              <section className="gallery">
+                {items.length === 0 ? (
+                  <div className="trash-empty">
+                    <div className="trash-empty-title">Trash is empty</div>
+                    <p>Deleted images will appear here.</p>
+                  </div>
+                ) : (
+                  <ul className="grid">
+                    {items.map((it) => (
+                      <li key={it.name} className="card">
+                        <div
+                          className="card-thumb-wrap"
+                          onClick={() => setLightbox(it)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={it.thumbUrl ?? it.url}
+                            alt={it.originalName ?? it.name}
+                            className="card-thumb"
+                          />
+                        </div>
+                        <div className="card-body">
+                          <div className="card-name" title={it.originalName ?? it.name}>
+                            {it.originalName ?? it.name}
+                          </div>
+                          <div className="card-meta">
+                            <button
+                              onClick={() => void restoreItem(it.name)}
+                              className="btn btn-sm"
+                            >
+                              Restore
+                            </button>
+                            <button
+                              onClick={() => void deleteForever(it.name)}
+                              className="btn btn-sm btn-danger"
+                            >
+                              Delete forever
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </main>
           ) : (
             <main className="page">
               {view === "album" && activeAlbumObj && (
@@ -802,6 +974,11 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
                               if (selecting) toggleSelected(it.name);
                               else setLightbox(it);
                             }}
+                            onContextMenu={(e) => {
+                              if (selecting) return;
+                              e.preventDefault();
+                              setMenu({ x: e.clientX, y: e.clientY, item: it });
+                            }}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -837,6 +1014,11 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
                               >
                                 i
                               </button>
+                            )}
+                            {it.isPublic && (
+                              <span className="card-public" title="Public link enabled">
+                                Public
+                              </span>
                             )}
                           </div>
                           <div className="card-body">
@@ -1034,5 +1216,59 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
         </div>
       )}
     </div>
+      {menu && (() => {
+        const it = menu.item;
+        const publicUrl = origin ? `${origin}/i/${it.name}` : `/i/${it.name}`;
+        const items: ContextMenuItem[] = [
+          {
+            kind: "item",
+            label: it.isPublic ? "Make private" : "Make public",
+            onSelect: () => void setItemPublic(it.name, !it.isPublic),
+          },
+          {
+            kind: "item",
+            label: "Copy public link",
+            disabled: !it.isPublic,
+            onSelect: () => copy(publicUrl),
+          },
+          { kind: "separator" },
+          {
+            kind: "item",
+            label: "Copy URL",
+            onSelect: () => copy(publicUrl),
+          },
+          {
+            kind: "item",
+            label: "View info",
+            onSelect: () => setInfoFor(it),
+          },
+          {
+            kind: "submenu",
+            label: "Move to album",
+            options: [
+              { value: "__none__", label: "Unfiled" },
+              ...albums.map((a) => ({ value: a.id, label: a.name })),
+            ],
+            onSelect: (v) =>
+              void assignItemToAlbum(it.name, v === "__none__" ? null : v),
+          },
+          { kind: "separator" },
+          {
+            kind: "item",
+            label: "Delete",
+            danger: true,
+            onSelect: () => void deleteItem(it.name),
+          },
+        ];
+        return (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            items={items}
+            onClose={() => setMenu(null)}
+          />
+        );
+      })()}
+    </>
   );
 }

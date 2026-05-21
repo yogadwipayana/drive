@@ -46,11 +46,14 @@ CREATE TABLE IF NOT EXISTS images (
   width INTEGER,
   height INTEGER,
   uploadedAt INTEGER NOT NULL,
-  albumId TEXT REFERENCES albums(id) ON DELETE SET NULL
+  albumId TEXT REFERENCES albums(id) ON DELETE SET NULL,
+  isPublic INTEGER NOT NULL DEFAULT 0,
+  deletedAt INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_images_userId ON images(userId);
 CREATE INDEX IF NOT EXISTS idx_images_albumId ON images(albumId);
 CREATE INDEX IF NOT EXISTS idx_images_uploadedAt ON images(uploadedAt);
+CREATE INDEX IF NOT EXISTS idx_images_deletedAt ON images(deletedAt);
 `;
 
 let dbInstance: Database.Database | null = null;
@@ -76,6 +79,17 @@ function init(): Database.Database {
   db.pragma("foreign_keys = ON");
 
   db.exec(SCHEMA);
+
+  const imageCols = db
+    .prepare("PRAGMA table_info(images)")
+    .all() as Array<{ name: string }>;
+  if (!imageCols.some((c) => c.name === "isPublic")) {
+    db.exec("ALTER TABLE images ADD COLUMN isPublic INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!imageCols.some((c) => c.name === "deletedAt")) {
+    db.exec("ALTER TABLE images ADD COLUMN deletedAt INTEGER");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_images_deletedAt ON images(deletedAt)");
+  }
 
   if (isFirstRun) {
     db.prepare(

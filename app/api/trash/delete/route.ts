@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSafeStoredName } from "@/lib/storage";
-import { getImage, softDeleteImage } from "@/lib/metadata";
+import { unlink } from "node:fs/promises";
+import path from "node:path";
+import { UPLOAD_DIR, isSafeStoredName } from "@/lib/storage";
+import { deleteImage, getImage } from "@/lib/metadata";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -35,19 +37,44 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const uploadRoot = path.resolve(UPLOAD_DIR);
   const deleted: string[] = [];
   const missing: string[] = [];
-  const at = Date.now();
+  const failed: { name: string; error: string }[] = [];
 
   for (const name of names as string[]) {
-    const image = getImage(name);
-    if (!image || image.userId !== user.id) {
+    const image = getImage(name, { includeDeleted: true });
+    if (!image || image.userId !== user.id || !image.deletedAt) {
       missing.push(name);
       continue;
     }
-    softDeleteImage(name, at);
+
+    const resolved = path.resolve(path.join(UPLOAD_DIR, name));
+    if (!resolved.startsWith(uploadRoot + path.sep)) {
+      failed.push({ name, error: "Invalid path" });
+      continue;
+    }
+
+    try {
+      await unlink(resolved);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code !== "ENOENT") {
+        failed.push({
+          name,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+        continue;
+      }
+    }
+    try {
+      await unlink(path.join(UPLOAD_DIR, ".thumbs", `${name}.webp`));
+    } catch {
+      // best-effort
+    }
+    deleteImage(name);
     deleted.push(name);
   }
 
-  return NextResponse.json({ deleted, missing, failed: [] });
+  return NextResponse.json({ deleted, missing, failed });
 }
