@@ -316,7 +316,17 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
       const imageFiles = Array.from(e.clipboardData?.items ?? [])
         .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
         .map((item) => item.getAsFile())
-        .filter((f): f is File => f !== null);
+        .filter((f): f is File => f !== null)
+        .map((f) => {
+          if (f.name && f.name !== "image.png") return f;
+          const ext = f.type.split("/")[1] || "png";
+          const ts = new Date()
+            .toISOString()
+            .replace(/[:.]/g, "-")
+            .replace("T", "_")
+            .slice(0, 19);
+          return new File([f], `pasted-${ts}.${ext}`, { type: f.type });
+        });
       if (imageFiles.length) void upload(imageFiles);
     };
     window.addEventListener("paste", onPaste);
