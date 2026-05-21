@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 
 type Album = { id: string; name: string; createdAt: number; count: number };
 type View = "home" | "trash" | "album" | "unfiled";
@@ -72,6 +73,12 @@ export default function Sidebar({
     },
     [onSelectAlbum, mobileOpen, onCloseMobile]
   );
+
+  const [albumMenu, setAlbumMenu] = useState<
+    { x: number; y: number; album: Album } | null
+  >(null);
+
+  const closeAlbumMenu = useCallback(() => setAlbumMenu(null), []);
 
   return (
     <>
@@ -151,6 +158,10 @@ export default function Sidebar({
                       className={`sidebar-album${isActive ? " is-active" : ""}`}
                       onClick={() => handleAlbum(album.id)}
                       onDoubleClick={() => onRenameAlbum(album.id, album.name)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setAlbumMenu({ x: e.clientX, y: e.clientY, album });
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
@@ -158,7 +169,7 @@ export default function Sidebar({
                         }
                       }}
                       aria-current={isActive ? "page" : undefined}
-                      title="Click to open · double-click to rename"
+                      title="Click to open · double-click to rename · right-click for more"
                     >
                       <span className="sidebar-album-name">{album.name}</span>
                       <span className="sidebar-album-count">{album.count}</span>
@@ -181,6 +192,36 @@ export default function Sidebar({
           )}
         </div>
       </aside>
+      {albumMenu && (
+        <ContextMenu
+          x={albumMenu.x}
+          y={albumMenu.y}
+          items={
+            [
+              {
+                kind: "item",
+                label: "Open",
+                onSelect: () => handleAlbum(albumMenu.album.id),
+              },
+              {
+                kind: "item",
+                label: "Rename",
+                onSelect: () =>
+                  onRenameAlbum(albumMenu.album.id, albumMenu.album.name),
+              },
+              { kind: "separator" },
+              {
+                kind: "item",
+                label: "Delete",
+                danger: true,
+                onSelect: () =>
+                  onDeleteAlbum(albumMenu.album.id, albumMenu.album.name),
+              },
+            ] satisfies ContextMenuItem[]
+          }
+          onClose={closeAlbumMenu}
+        />
+      )}
     </>
   );
 }
