@@ -172,3 +172,21 @@ export const MoonIcon = ({ size, className }: IconProps) => (
     <path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36A5.4 5.4 0 0112 3z" />
   </svg>
 );
+
+export const VisibilityIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z" />
+  </svg>
+);
+
+export const VisibilityOffIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 7a5 5 0 015 5c0 .65-.13 1.26-.36 1.83l2.92 2.92A11.84 11.84 0 0023 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16A4.99 4.99 0 0112 7zM2 4.27l2.28 2.28.46.46A11.78 11.78 0 001 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55a2.96 2.96 0 00-.08.65 3 3 0 003 3c.22 0 .43-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53a5 5 0 01-5-5c0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16a3 3 0 00-3-3l-.17.01z" />
+  </svg>
+);
+
+export const WarningIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+  </svg>
+);

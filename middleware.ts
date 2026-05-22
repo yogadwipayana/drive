@@ -1,7 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { randomBytes } from "node:crypto";
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+// Edge runtime: use Web Crypto (node:crypto is unavailable here).
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s);
+}
 
 export function middleware(req: NextRequest) {
   if (MUTATING.has(req.method)) {
@@ -25,7 +33,7 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  const nonce = randomBytes(16).toString("base64");
+  const nonce = generateNonce();
 
   // script-src: nonce + strict-dynamic disables 'unsafe-inline' on CSP3
   // browsers; the literal is kept only as a fallback for legacy clients.
