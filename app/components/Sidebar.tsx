@@ -96,7 +96,6 @@ export default function Sidebar({
 
   return (
     <>
-      <div className="sidebar-backdrop" onClick={onCloseMobile} />
       <aside className={`sidebar${mobileOpen ? " is-open" : ""}`}>
 
         {/* Brand row */}
@@ -271,6 +270,17 @@ export default function Sidebar({
                       <span className="sidebar-album-count">{album.count}</span>
                       <button
                         type="button"
+                        className="sidebar-album-menu"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openMenu(e, { kind: "album", album });
+                        }}
+                        aria-label={`More actions for ${album.name}`}
+                      >
+                        ⋮
+                      </button>
+                      <button
+                        type="button"
                         className="sidebar-album-del"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -294,6 +304,7 @@ export default function Sidebar({
           <div className="sidebar-storage-text">3 GB of 15 GB used</div>
         </div>
       </aside>
+      <div className="sidebar-backdrop" onClick={onCloseMobile} />
 
       {/* Context menus */}
       {menu &&

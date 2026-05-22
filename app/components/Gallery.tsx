@@ -1003,6 +1003,20 @@ export default function HomePage({ userEmail }: { userEmail: string }) {
                             )}
                             {!selecting && (
                               <button
+                                className="card-menu"
+                                title="More actions"
+                                aria-label={`More actions for ${it.originalName ?? it.name}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setMenu({ x: rect.right - 240, y: rect.bottom + 6, item: it });
+                                }}
+                              >
+                                ⋮
+                              </button>
+                            )}
+                            {!selecting && (
+                              <button
                                 className="card-delete"
                                 title="Delete"
                                 onClick={(e) => {
